@@ -34,6 +34,7 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   merchant: text("merchant").notNull(),
   category: text("category").notNull(),
@@ -46,6 +47,7 @@ export const expenses = pgTable("expenses", {
 
 export const insertExpenseSchema = createInsertSchema(expenses).omit({
   id: true,
+  userId: true,
 }).extend({
   date: z.union([z.string(), z.date()]).transform((val) => {
     if (typeof val === 'string') {
@@ -60,13 +62,15 @@ export type Expense = typeof expenses.$inferSelect;
 
 export const budgets = pgTable("budgets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  category: text("category").notNull().unique(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  category: text("category").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertBudgetSchema = createInsertSchema(budgets).omit({
   id: true,
+  userId: true,
   updatedAt: true,
 });
 

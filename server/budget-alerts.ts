@@ -9,12 +9,12 @@ interface BudgetAlert {
 }
 
 export class BudgetAlertsService {
-    async checkBudgetAlerts(): Promise<BudgetAlert[]> {
+    async checkBudgetAlerts(userId: string): Promise<BudgetAlert[]> {
         const alerts: BudgetAlert[] = [];
 
         try {
-            const budgets = await storage.getBudgets();
-            const expenses = await storage.getExpenses();
+            const budgets = await storage.getBudgets(userId);
+            const expenses = await storage.getExpenses(userId);
 
             // Calculate current month spending by category
             const now = new Date();
@@ -60,8 +60,8 @@ export class BudgetAlertsService {
         }
     }
 
-    async getBudgetStatus() {
-        const alerts = await this.checkBudgetAlerts();
+    async getBudgetStatus(userId: string) {
+        const alerts = await this.checkBudgetAlerts(userId);
 
         return {
             hasAlerts: alerts.length > 0,

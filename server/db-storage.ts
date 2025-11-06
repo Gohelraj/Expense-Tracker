@@ -45,69 +45,83 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createExpense(insertExpense: InsertExpense): Promise<Expense> {
-    const result = await db.insert(expenses).values(insertExpense).returning();
+  async createExpense(insertExpense: InsertExpense, userId: string): Promise<Expense> {
+    const result = await db.insert(expenses).values({ ...insertExpense, userId }).returning();
     return result[0];
   }
 
-  async getExpenses(): Promise<Expense[]> {
-    return await db.select().from(expenses).orderBy(desc(expenses.date));
+  async getExpenses(userId: string): Promise<Expense[]> {
+    return await db.select().from(expenses)
+      .where(eq(expenses.userId, userId))
+      .orderBy(desc(expenses.date));
   }
 
-  async getExpenseById(id: string): Promise<Expense | undefined> {
-    const result = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  async getExpenseById(id: string, userId: string): Promise<Expense | undefined> {
+    const result = await db.select().from(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .limit(1);
     return result[0];
   }
 
-  async updateExpense(id: string, updates: Partial<InsertExpense>): Promise<Expense | undefined> {
-    const result = await db.update(expenses).set(updates).where(eq(expenses.id, id)).returning();
+  async updateExpense(id: string, userId: string, updates: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const result = await db.update(expenses)
+      .set(updates)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning();
     return result[0];
   }
 
-  async deleteExpense(id: string): Promise<boolean> {
-    const result = await db.delete(expenses).where(eq(expenses.id, id)).returning();
+  async deleteExpense(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning();
     return result.length > 0;
   }
 
-  async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]> {
+  async getExpensesByDateRange(startDate: Date, endDate: Date, userId: string): Promise<Expense[]> {
     return await db.select().from(expenses)
       .where(and(
+        eq(expenses.userId, userId),
         gte(expenses.date, startDate),
         lte(expenses.date, endDate)
       ))
       .orderBy(desc(expenses.date));
   }
 
-  async getExpensesByCategory(category: string): Promise<Expense[]> {
+  async getExpensesByCategory(category: string, userId: string): Promise<Expense[]> {
     return await db.select().from(expenses)
-      .where(eq(expenses.category, category))
+      .where(and(eq(expenses.userId, userId), eq(expenses.category, category)))
       .orderBy(desc(expenses.date));
   }
 
-  async createBudget(insertBudget: InsertBudget): Promise<Budget> {
-    const result = await db.insert(budgets).values(insertBudget).returning();
+  async createBudget(insertBudget: InsertBudget, userId: string): Promise<Budget> {
+    const result = await db.insert(budgets).values({ ...insertBudget, userId }).returning();
     return result[0];
   }
 
-  async getBudgets(): Promise<Budget[]> {
-    return await db.select().from(budgets);
+  async getBudgets(userId: string): Promise<Budget[]> {
+    return await db.select().from(budgets).where(eq(budgets.userId, userId));
   }
 
-  async getBudgetByCategory(category: string): Promise<Budget | undefined> {
-    const result = await db.select().from(budgets).where(eq(budgets.category, category)).limit(1);
+  async getBudgetByCategory(category: string, userId: string): Promise<Budget | undefined> {
+    const result = await db.select().from(budgets)
+      .where(and(eq(budgets.category, category), eq(budgets.userId, userId)))
+      .limit(1);
     return result[0];
   }
 
-  async updateBudget(category: string, amount: string): Promise<Budget | undefined> {
+  async updateBudget(category: string, userId: string, amount: string): Promise<Budget | undefined> {
     const result = await db.update(budgets)
       .set({ amount, updatedAt: new Date() })
-      .where(eq(budgets.category, category))
+      .where(and(eq(budgets.category, category), eq(budgets.userId, userId)))
       .returning();
     return result[0];
   }
 
-  async deleteBudget(category: string): Promise<boolean> {
-    const result = await db.delete(budgets).where(eq(budgets.category, category)).returning();
+  async deleteBudget(category: string, userId: string): Promise<boolean> {
+    const result = await db.delete(budgets)
+      .where(and(eq(budgets.category, category), eq(budgets.userId, userId)))
+      .returning();
     return result.length > 0;
   }
 
