@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import type { gmail_v1 } from 'googleapis';
+import type { IStorage } from './storage';
 
 export interface EmailMessage {
   id: string;
@@ -12,7 +13,11 @@ export interface EmailMessage {
 
 export class GmailService {
   private gmail: gmail_v1.Gmail | null = null;
-  private isReplitConnector: boolean = false;
+  private storage: IStorage;
+
+  constructor(storage: IStorage) {
+    this.storage = storage;
+  }
 
   async initialize(): Promise<boolean> {
     try {
@@ -60,20 +65,30 @@ export class GmailService {
       const batchSize = parseInt(process.env.EMAIL_SYNC_BATCH_SIZE || '50');
       const initialBatchSize = parseInt(process.env.EMAIL_SYNC_INITIAL_BATCH_SIZE || '200');
 
-      // Search for emails from bank domains
-      const bankDomains = [
-        'hdfcbank.com',
-        'icicibank.com',
-        'sbi.co.in',
-        'axisbank.com',
-        'yesbank.in',
-        'kotak.com',
-        'indusind.com',
-        'pnb.co.in',
-        'bankofindia.com',
-        'paytm.com',
-        'phonepe.com',
-      ];
+      // Get bank domains from database
+      const bankPatterns = await this.storage.getBankPatterns();
+      const activePatterns = bankPatterns.filter(p => p.isActive === 'true');
+
+      let bankDomains: string[];
+      if (activePatterns.length > 0) {
+        // Use domains from database
+        bankDomains = activePatterns.map(p => p.domain);
+      } else {
+        // Fallback to hardcoded domains
+        bankDomains = [
+          'hdfcbank.com',
+          'icicibank.com',
+          'sbi.co.in',
+          'axisbank.com',
+          'yesbank.in',
+          'kotak.com',
+          'indusind.com',
+          'pnb.co.in',
+          'bankofindia.com',
+          'paytm.com',
+          'phonepe.com',
+        ];
+      }
 
       const query = bankDomains.map(domain => `from:${domain}`).join(' OR ');
 
@@ -163,4 +178,7 @@ export class GmailService {
   }
 }
 
-export const gmailService = new GmailService();
+// Export factory function for dependency injection
+export function createGmailService(storage: IStorage): GmailService {
+  return new GmailService(storage);
+}

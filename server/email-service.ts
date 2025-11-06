@@ -132,4 +132,7 @@ export class EmailService {
     }
 }
 
-export const emailService = new EmailService();
+// Export factory function for dependency injection
+export function createEmailService(storage?: any): EmailService {
+  return new EmailService();
+}

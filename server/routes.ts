@@ -1,18 +1,25 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import type { IStorage } from "./storage";
+import type { EmailParser } from "./email-parser";
+import type { GmailService } from "./gmail-service";
+import type { EmailPollingService } from "./email-polling-service";
+import type { EmailService } from "./email-service";
 import { insertExpenseSchema, insertBudgetSchema, insertUserSchema, insertBankPatternSchema, insertCategorySchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
-import { emailParser } from "./email-parser";
-import { gmailService } from "./gmail-service";
-import { emailPollingService } from "./email-polling-service";
 import { budgetAlertsService } from "./budget-alerts";
-import { emailService } from "./email-service";
 import { requireAuth, getCurrentUserId } from "./auth-middleware";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(
+  app: Express,
+  storage: IStorage,
+  emailParser: EmailParser,
+  gmailService: GmailService,
+  emailPollingService: EmailPollingService,
+  emailService: EmailService
+): Promise<Server> {
   // Authentication routes
 
   // Register
@@ -270,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update expense
+  // Update expense (supports both partial and full updates)
   app.patch("/api/expenses/:id", requireAuth, async (req, res) => {
     try {
       const userId = getCurrentUserId(req)!;
@@ -278,27 +285,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = {
         ...req.body,
         // Ensure date is properly formatted if provided
-        date: req.body.date ? new Date(req.body.date) : undefined,
-      };
-
-      const expense = await storage.updateExpense(req.params.id, userId, updateData);
-      if (!expense) {
-        return res.status(404).json({ error: "Expense not found" });
-      }
-      res.json(expense);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Update expense (PUT method for full update)
-  app.put("/api/expenses/:id", requireAuth, async (req, res) => {
-    try {
-      const userId = getCurrentUserId(req)!;
-      // Validate the update data (partial schema validation)
-      const updateData = {
-        ...req.body,
-        // Ensure date is properly formatted
         date: req.body.date ? new Date(req.body.date) : undefined,
       };
 
@@ -534,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const parsed = emailParser.parseEmail(subject, body, sender);
+      const parsed = await emailParser.parseEmail(subject, body, sender);
 
       if (!parsed) {
         return res.json({
@@ -564,7 +550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const parsed = emailParser.parseEmail(subject, body, sender);
+      const parsed = await emailParser.parseEmail(subject, body, sender);
 
       if (!parsed) {
         return res.json({
@@ -679,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bank Pattern routes
 
   // Create bank pattern
-  app.post("/api/bank-patterns", async (req, res) => {
+  app.post("/api/bank-patterns", requireAuth, async (req, res) => {
     try {
       const result = insertBankPatternSchema.safeParse(req.body);
       if (!result.success) {
@@ -719,7 +705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update bank pattern
-  app.patch("/api/bank-patterns/:id", async (req, res) => {
+  app.patch("/api/bank-patterns/:id", requireAuth, async (req, res) => {
     try {
       const bankPattern = await storage.updateBankPattern(req.params.id, req.body);
       if (!bankPattern) {
@@ -732,7 +718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete bank pattern
-  app.delete("/api/bank-patterns/:id", async (req, res) => {
+  app.delete("/api/bank-patterns/:id", requireAuth, async (req, res) => {
     try {
       const deleted = await storage.deleteBankPattern(req.params.id);
       if (!deleted) {
@@ -747,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Category routes
 
   // Create category
-  app.post("/api/categories", async (req, res) => {
+  app.post("/api/categories", requireAuth, async (req, res) => {
     try {
       const result = insertCategorySchema.safeParse(req.body);
       if (!result.success) {
@@ -793,7 +779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update category
-  app.patch("/api/categories/:id", async (req, res) => {
+  app.patch("/api/categories/:id", requireAuth, async (req, res) => {
     try {
       const category = await storage.updateCategory(req.params.id, req.body);
       if (!category) {
@@ -806,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete category
-  app.delete("/api/categories/:id", async (req, res) => {
+  app.delete("/api/categories/:id", requireAuth, async (req, res) => {
     try {
       const deleted = await storage.deleteCategory(req.params.id);
       if (!deleted) {

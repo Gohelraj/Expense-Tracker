@@ -3,8 +3,17 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { emailPollingService } from "./email-polling-service";
-import { emailService } from "./email-service";
+import { createEmailPollingService } from "./email-polling-service";
+import { createEmailService } from "./email-service";
+import { createGmailService } from "./gmail-service";
+import { createEmailParser } from "./email-parser";
+import { storage } from "./storage";
+
+// Initialize services with proper dependency injection
+const emailService = createEmailService(storage);
+const emailParser = createEmailParser(storage);
+const gmailService = createGmailService(storage);
+const emailPollingService = createEmailPollingService(storage, gmailService, emailParser);
 
 const app = express();
 
@@ -69,7 +78,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  const server = await registerRoutes(app, storage, emailParser, gmailService, emailPollingService, emailService);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

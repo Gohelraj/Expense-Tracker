@@ -1,4 +1,5 @@
-import type { InsertExpense } from "@shared/schema";
+import type { InsertExpense, BankPattern, Category } from "@shared/schema";
+import type { IStorage } from "./storage";
 
 interface ParsedTransaction {
   amount: string;
@@ -9,7 +10,10 @@ interface ParsedTransaction {
 }
 
 export class EmailParser {
-  private indianBankPatterns = {
+  private storage: IStorage;
+
+  // Fallback patterns in case database is empty
+  private fallbackBankPatterns = {
     amount: [
       /(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
       /(?:debited|spent|payment|transaction)\s+(?:of\s+)?(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
@@ -59,7 +63,8 @@ export class EmailParser {
     ],
   };
 
-  private categoryKeywords = {
+  // Fallback category keywords in case database is empty
+  private fallbackCategoryKeywords = {
     'Food & Dining': ['swiggy', 'zomato', 'restaurant', 'cafe', 'food', 'dining', 'burger', 'pizza', 'dominos'],
     'Transport': ['uber', 'ola', 'rapido', 'metro', 'fuel', 'petrol', 'diesel', 'parking'],
     'Shopping': ['amazon', 'flipkart', 'myntra', 'ajio', 'shopping', 'mall', 'store'],
@@ -69,8 +74,12 @@ export class EmailParser {
     'Groceries': ['bigbasket', 'grofers', 'blinkit', 'grocery', 'supermarket', 'dmart'],
   };
 
-  parseEmail(subject: string, body: string, sender: string, emailDate?: Date): ParsedTransaction | null {
-    if (!this.isBankEmail(sender)) {
+  constructor(storage: IStorage) {
+    this.storage = storage;
+  }
+
+  async parseEmail(subject: string, body: string, sender: string, emailDate?: Date): Promise<ParsedTransaction | null> {
+    if (!(await this.isBankEmail(sender))) {
       return null;
     }
 
@@ -81,16 +90,20 @@ export class EmailParser {
       return null;
     }
 
-    const amount = this.extractAmount(text);
-    const merchant = this.extractMerchant(text);
-    const transactionDate = this.extractDate(text);
+    // Get bank patterns and categories from database
+    const bankPatterns = await this.storage.getBankPatterns();
+    const categories = await this.storage.getCategories();
+
+    const amount = await this.extractAmount(text, bankPatterns);
+    const merchant = await this.extractMerchant(text, bankPatterns);
+    const transactionDate = await this.extractDate(text, bankPatterns);
 
     if (!amount || !merchant) {
       return null;
     }
 
-    const category = this.categorizeTransaction(merchant, text);
-    const paymentMethod = this.extractPaymentMethod(text);
+    const category = await this.categorizeTransaction(merchant, text, categories);
+    const paymentMethod = await this.extractPaymentMethod(text, bankPatterns);
 
     // Use transaction date from email content, fallback to email date, then current date
     const finalDate = transactionDate || emailDate || new Date();
@@ -104,8 +117,22 @@ export class EmailParser {
     };
   }
 
-  private isBankEmail(sender: string): boolean {
-    const bankDomains = [
+  async isBankEmail(sender: string, bankPatterns?: BankPattern[]): Promise<boolean> {
+    // If bank patterns provided or available, use them
+    if (!bankPatterns) {
+      bankPatterns = await this.storage.getBankPatterns();
+    }
+
+    // Check against database patterns first (active patterns only)
+    const activePatterns = bankPatterns.filter(p => p.isActive === 'true');
+    if (activePatterns.length > 0) {
+      return activePatterns.some(pattern =>
+        sender.toLowerCase().includes(pattern.domain.toLowerCase())
+      );
+    }
+
+    // Fallback to hardcoded domains if database is empty
+    const fallbackDomains = [
       'hdfcbank',
       'icicibank',
       'sbi',
@@ -122,11 +149,30 @@ export class EmailParser {
       'notification',
     ];
 
-    return bankDomains.some(domain => sender.toLowerCase().includes(domain));
+    return fallbackDomains.some(domain => sender.toLowerCase().includes(domain));
   }
 
-  private extractAmount(text: string): string | null {
-    for (const pattern of this.indianBankPatterns.amount) {
+  private async extractAmount(text: string, bankPatterns: BankPattern[]): Promise<string | null> {
+    // Try database patterns first (active patterns only)
+    const activePatterns = bankPatterns.filter(p => p.isActive === 'true');
+    for (const bankPattern of activePatterns) {
+      try {
+        const patterns = JSON.parse(bankPattern.amountPatterns) as string[];
+        for (const patternStr of patterns) {
+          const pattern = new RegExp(patternStr, 'i');
+          const match = text.match(pattern);
+          if (match && match[1]) {
+            const amount = match[1].replace(/,/g, '');
+            return parseFloat(amount).toFixed(2);
+          }
+        }
+      } catch (error) {
+        console.error(`Error parsing amount patterns for ${bankPattern.bankName}:`, error);
+      }
+    }
+
+    // Fallback to hardcoded patterns
+    for (const pattern of this.fallbackBankPatterns.amount) {
       const match = text.match(pattern);
       if (match && match[1]) {
         const amount = match[1].replace(/,/g, '');
@@ -136,11 +182,33 @@ export class EmailParser {
     return null;
   }
 
-  private extractMerchant(text: string): string | null {
+  private async extractMerchant(text: string, bankPatterns: BankPattern[]): Promise<string | null> {
     // Clean the text first - remove extra whitespace and newlines
     const cleanText = text.replace(/\s+/g, ' ').trim();
 
-    for (const pattern of this.indianBankPatterns.merchant) {
+    // Try database patterns first (active patterns only)
+    const activePatterns = bankPatterns.filter(p => p.isActive === 'true');
+    for (const bankPattern of activePatterns) {
+      try {
+        const patterns = JSON.parse(bankPattern.merchantPatterns) as string[];
+        for (const patternStr of patterns) {
+          const pattern = new RegExp(patternStr, 'i');
+          const match = cleanText.match(pattern);
+          if (match && match[1]) {
+            let merchant = match[1].trim();
+            merchant = this.cleanMerchantName(merchant);
+            if (this.isValidMerchantName(merchant)) {
+              return merchant;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error parsing merchant patterns for ${bankPattern.bankName}:`, error);
+      }
+    }
+
+    // Fallback to hardcoded patterns
+    for (const pattern of this.fallbackBankPatterns.merchant) {
       const match = cleanText.match(pattern);
       if (match && match[1]) {
         let merchant = match[1].trim();
@@ -243,44 +311,91 @@ export class EmailParser {
     return true;
   }
 
-  private extractDate(text: string): Date | null {
-    for (const pattern of this.indianBankPatterns.date) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        let dateStr = match[1].trim();
-
-        // Handle DD-MM-YYYY or DD/MM/YYYY format (Indian format)
-        if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(dateStr)) {
-          const parts = dateStr.split(/[-/]/);
-          if (parts.length === 3) {
-            const day = parseInt(parts[0]);
-            const month = parseInt(parts[1]) - 1; // Month is 0-indexed
-            let year = parseInt(parts[2]);
-
-            // Handle 2-digit years
-            if (year < 100) {
-              year += year < 50 ? 2000 : 1900;
-            }
-
-            const parsed = new Date(year, month, day);
-            if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2020) {
-              return parsed;
-            }
+  private async extractDate(text: string, bankPatterns: BankPattern[]): Promise<Date | null> {
+    // Try database patterns first (active patterns only)
+    const activePatterns = bankPatterns.filter(p => p.isActive === 'true');
+    for (const bankPattern of activePatterns) {
+      try {
+        const patterns = JSON.parse(bankPattern.datePatterns) as string[];
+        for (const patternStr of patterns) {
+          const pattern = new RegExp(patternStr, 'i');
+          const match = text.match(pattern);
+          if (match && match[1]) {
+            const parsed = this.parseDate(match[1].trim());
+            if (parsed) return parsed;
           }
         }
+      } catch (error) {
+        console.error(`Error parsing date patterns for ${bankPattern.bankName}:`, error);
+      }
+    }
 
-        // Try standard Date parsing for other formats
-        const parsed = new Date(dateStr);
-        if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2020) {
-          return parsed;
-        }
+    // Fallback to hardcoded patterns
+    for (const pattern of this.fallbackBankPatterns.date) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const parsed = this.parseDate(match[1].trim());
+        if (parsed) return parsed;
       }
     }
     return null;
   }
 
-  private extractPaymentMethod(text: string): string {
-    for (const pattern of this.indianBankPatterns.paymentMethod) {
+  private parseDate(dateStr: string): Date | null {
+    // Handle DD-MM-YYYY or DD/MM/YYYY format (Indian format)
+    if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(dateStr)) {
+      const parts = dateStr.split(/[-/]/);
+      if (parts.length === 3) {
+        const day = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+        let year = parseInt(parts[2]);
+
+        // Handle 2-digit years
+        if (year < 100) {
+          year += year < 50 ? 2000 : 1900;
+        }
+
+        const parsed = new Date(year, month, day);
+        if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2020) {
+          return parsed;
+        }
+      }
+    }
+
+    // Try standard Date parsing for other formats
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2020) {
+      return parsed;
+    }
+
+    return null;
+  }
+
+  private async extractPaymentMethod(text: string, bankPatterns: BankPattern[]): Promise<string> {
+    // Try database patterns first (active patterns only)
+    const activePatterns = bankPatterns.filter(p => p.isActive === 'true');
+    for (const bankPattern of activePatterns) {
+      try {
+        const patterns = JSON.parse(bankPattern.paymentMethodPatterns) as string[];
+        for (const patternStr of patterns) {
+          const pattern = new RegExp(patternStr, 'i');
+          const match = text.match(pattern);
+          if (match && match[1]) {
+            const method = match[1].toLowerCase();
+            if (method.includes('credit')) return 'Credit Card';
+            if (method.includes('debit')) return 'Debit Card';
+            if (method.includes('upi')) return 'UPI';
+            if (method.includes('net banking')) return 'Net Banking';
+            if (method.includes('wallet')) return 'Wallet';
+          }
+        }
+      } catch (error) {
+        console.error(`Error parsing payment method patterns for ${bankPattern.bankName}:`, error);
+      }
+    }
+
+    // Fallback to hardcoded patterns
+    for (const pattern of this.fallbackBankPatterns.paymentMethod) {
       const match = text.match(pattern);
       if (match && match[1]) {
         const method = match[1].toLowerCase();
@@ -311,11 +426,27 @@ export class EmailParser {
     return creditPatterns.some(pattern => pattern.test(lowerText));
   }
 
-  private categorizeTransaction(merchant: string, text: string): string {
+  private async categorizeTransaction(merchant: string, text: string, categories: Category[]): Promise<string> {
     const lowerMerchant = merchant.toLowerCase();
     const lowerText = text.toLowerCase();
 
-    for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
+    // Try database categories first (active categories only)
+    const activeCategories = categories.filter(c => c.isActive === 'true');
+    for (const category of activeCategories) {
+      try {
+        const keywords = JSON.parse(category.keywords) as string[];
+        for (const keyword of keywords) {
+          if (lowerMerchant.includes(keyword.toLowerCase()) || lowerText.includes(keyword.toLowerCase())) {
+            return category.name;
+          }
+        }
+      } catch (error) {
+        console.error(`Error parsing keywords for category ${category.name}:`, error);
+      }
+    }
+
+    // Fallback to hardcoded keywords
+    for (const [category, keywords] of Object.entries(this.fallbackCategoryKeywords)) {
       for (const keyword of keywords) {
         if (lowerMerchant.includes(keyword) || lowerText.includes(keyword)) {
           return category;
@@ -338,4 +469,7 @@ export class EmailParser {
   }
 }
 
-export const emailParser = new EmailParser();
+// Export factory function instead of singleton to allow dependency injection
+export function createEmailParser(storage: IStorage): EmailParser {
+  return new EmailParser(storage);
+}

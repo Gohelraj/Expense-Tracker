@@ -1,12 +1,24 @@
-import { gmailService } from './gmail-service';
-import { emailParser } from './email-parser';
-import { storage } from './storage';
+import type { IStorage } from './storage';
+import type { GmailService } from './gmail-service';
+import type { EmailParser } from './email-parser';
+import { insertExpenseSchema } from '@shared/schema';
 
 export class EmailPollingService {
   private pollingInterval: NodeJS.Timeout | null = null;
   private isPolling: boolean = false;
   private lastSyncTime: Date | null = null;
   private hasPerformedInitialSync: boolean = false;
+  private storage: IStorage;
+  private gmailService: GmailService;
+  private emailParser: EmailParser;
+  // For single-user mode: store the user ID for automatic expense creation
+  private defaultUserId: string | null = null;
+
+  constructor(storage: IStorage, gmailService: GmailService, emailParser: EmailParser) {
+    this.storage = storage;
+    this.gmailService = gmailService;
+    this.emailParser = emailParser;
+  }
 
   async start(intervalMinutes?: number): Promise<void> {
     if (this.pollingInterval) {
@@ -15,7 +27,7 @@ export class EmailPollingService {
     }
 
     // Initialize Gmail service
-    const initialized = await gmailService.initialize();
+    const initialized = await this.gmailService.initialize();
     if (!initialized) {
       console.log('Gmail service not initialized. Skipping email polling.');
       return;
@@ -53,6 +65,12 @@ export class EmailPollingService {
     }
   }
 
+  // Set the default user ID for expense creation (for single-user deployments)
+  setDefaultUserId(userId: string): void {
+    this.defaultUserId = userId;
+    console.log(`Email polling will create expenses for user: ${userId}`);
+  }
+
   private async pollEmails(): Promise<void> {
     try {
       const isInitialSync = !this.hasPerformedInitialSync;
@@ -60,15 +78,16 @@ export class EmailPollingService {
 
       console.log(`${syncType}: Polling for bank transaction emails...`);
 
-      const emails = await gmailService.getRecentEmails(undefined, isInitialSync);
+      const emails = await this.gmailService.getRecentEmails(undefined, isInitialSync);
       console.log(`Found ${emails.length} potential bank emails`);
 
       let processedCount = 0;
       let createdCount = 0;
+      let skippedCount = 0;
 
       for (const email of emails) {
         // Check if we've already processed this email
-        const alreadyProcessed = await storage.isEmailProcessed(email.id);
+        const alreadyProcessed = await this.storage.isEmailProcessed(email.id);
         if (alreadyProcessed) {
           continue;
         }
@@ -76,22 +95,41 @@ export class EmailPollingService {
         processedCount++;
 
         // Try to parse the email (only debits/expenses)
-        const parsed = emailParser.parseEmail(email.subject, email.body, email.from, email.date);
+        const parsed = await this.emailParser.parseEmail(email.subject, email.body, email.from, email.date);
 
         if (parsed) {
-          // TODO: Email polling needs to be user-specific
-          // For now, skip automatic expense creation from polling
-          // Users can manually parse emails via the parse-and-create endpoint
+          // Mark email as processed first to avoid reprocessing
+          await this.storage.markEmailAsProcessed(email.id);
 
-          // Mark email as processed to avoid reprocessing
-          try {
-            await storage.markEmailAsProcessed(email.id);
-            createdCount++;
+          // Create expense if we have a default user ID configured
+          if (this.defaultUserId) {
+            try {
+              const expenseData = {
+                ...this.emailParser.toExpense(parsed),
+                source: 'email' as const,
+                emailId: email.id,
+              };
 
-            console.log(`💳 Created expense: ${parsed.merchant} - ₹${parsed.amount}`);
-          } catch (error) {
-            console.error(`Failed to create expense from email ${email.id}:`, error);
+              const result = insertExpenseSchema.safeParse(expenseData);
+              if (result.success) {
+                await this.storage.createExpense(result.data, this.defaultUserId);
+                createdCount++;
+                console.log(`💳 Created expense: ${parsed.merchant} - ₹${parsed.amount}`);
+              } else {
+                console.error(`Invalid expense data for email ${email.id}:`, result.error);
+                skippedCount++;
+              }
+            } catch (error) {
+              console.error(`Failed to create expense from email ${email.id}:`, error);
+              skippedCount++;
+            }
+          } else {
+            console.warn(`Skipping expense creation - no default user ID configured`);
+            skippedCount++;
           }
+        } else {
+          // Email didn't parse to a transaction
+          await this.storage.markEmailAsProcessed(email.id);
         }
       }
 
@@ -100,7 +138,12 @@ export class EmailPollingService {
         this.hasPerformedInitialSync = true;
       }
 
-      console.log(`${syncType} complete. Processed ${processedCount} new emails, created ${createdCount} expenses.`);
+      console.log(`${syncType} complete. Processed ${processedCount} new emails, created ${createdCount} expenses, skipped ${skippedCount}.`);
+
+      if (!this.defaultUserId && processedCount > 0) {
+        console.log(`⚠️  Email polling is running but no default user is configured for expense creation.`);
+        console.log(`   Set EXPENSE_DEFAULT_USER_ID environment variable or use setDefaultUserId() to enable automatic expense creation.`);
+      }
     } catch (error) {
       console.error('Error during email polling:', error);
     }
@@ -114,4 +157,15 @@ export class EmailPollingService {
   }
 }
 
-export const emailPollingService = new EmailPollingService();
+// Export factory function for dependency injection
+export function createEmailPollingService(storage: IStorage, gmailService: GmailService, emailParser: EmailParser): EmailPollingService {
+  const service = new EmailPollingService(storage, gmailService, emailParser);
+
+  // Check for default user ID from environment variable
+  const defaultUserId = process.env.EXPENSE_DEFAULT_USER_ID;
+  if (defaultUserId) {
+    service.setDefaultUserId(defaultUserId);
+  }
+
+  return service;
+}
