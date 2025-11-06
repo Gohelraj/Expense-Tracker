@@ -1,13 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertExpenseSchema, insertBudgetSchema, insertUserSchema, insertBankPatternSchema, insertCategorySchema } from "@shared/schema";
+import { insertExpenseSchema, insertBudgetSchema, insertUserSchema, insertBankPatternSchema, insertCategorySchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { emailParser } from "./email-parser";
 import { gmailService } from "./gmail-service";
 import { emailPollingService } from "./email-polling-service";
 import { budgetAlertsService } from "./budget-alerts";
+import { emailService } from "./email-service";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -88,6 +90,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
       id: "demo-user",
       username: "demo"
     });
+  });
+
+  // Forgot password
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const result = forgotPasswordSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          error: fromZodError(result.error).message
+        });
+      }
+
+      const { email } = result.data;
+
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+
+      // Always return success to prevent email enumeration
+      if (!user) {
+        return res.json({
+          success: true,
+          message: "If an account with that email exists, a password reset link has been sent."
+        });
+      }
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+      // Save token to database
+      await storage.updateUserResetToken(email, resetToken, resetTokenExpiry);
+
+      // Send email
+      const emailSent = await emailService.sendPasswordResetEmail(email, resetToken);
+
+      if (!emailSent) {
+        console.error('Failed to send password reset email');
+        // Still return success to user for security
+      }
+
+      res.json({
+        success: true,
+        message: "If an account with that email exists, a password reset link has been sent."
+      });
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: "An error occurred. Please try again later." });
+    }
+  });
+
+  // Reset password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const result = resetPasswordSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          error: fromZodError(result.error).message
+        });
+      }
+
+      const { token, password } = result.data;
+
+      // Find user by reset token
+      const user = await storage.getUserByResetToken(token);
+
+      if (!user || !user.resetTokenExpiry) {
+        return res.status(400).json({
+          error: "Invalid or expired reset token"
+        });
+      }
+
+      // Check if token is expired
+      if (new Date() > user.resetTokenExpiry) {
+        return res.status(400).json({
+          error: "Reset token has expired. Please request a new one."
+        });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Update password and clear reset token
+      await storage.updateUserPassword(user.id, hashedPassword);
+
+      res.json({
+        success: true,
+        message: "Password has been reset successfully. You can now login with your new password."
+      });
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: "An error occurred. Please try again later." });
+    }
+  });
+
+  // Verify reset token
+  app.get("/api/auth/verify-reset-token/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      const user = await storage.getUserByResetToken(token);
+
+      if (!user || !user.resetTokenExpiry) {
+        return res.json({ valid: false, message: "Invalid reset token" });
+      }
+
+      if (new Date() > user.resetTokenExpiry) {
+        return res.json({ valid: false, message: "Reset token has expired" });
+      }
+
+      res.json({ valid: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Expense routes
@@ -480,6 +595,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await emailPollingService.start(5);
 
       res.json({ success: true, message: "Manual sync triggered" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Start email polling
+  app.post("/api/gmail/polling/start", async (req, res) => {
+    try {
+      if (!gmailService.isInitialized()) {
+        return res.status(400).json({
+          success: false,
+          error: "Gmail not configured. Please set up Gmail credentials."
+        });
+      }
+
+      const { intervalMinutes } = req.body;
+      await emailPollingService.start(intervalMinutes);
+
+      res.json({ success: true, message: "Email polling started" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Stop email polling
+  app.post("/api/gmail/polling/stop", async (req, res) => {
+    try {
+      emailPollingService.stop();
+      res.json({ success: true, message: "Email polling stopped" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Disconnect Gmail (stop polling)
+  app.post("/api/gmail/disconnect", async (req, res) => {
+    try {
+      emailPollingService.stop();
+      res.json({ success: true, message: "Gmail integration disconnected" });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }

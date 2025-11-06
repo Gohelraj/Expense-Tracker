@@ -19,6 +19,32 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async updateUserResetToken(email: string, token: string, expiry: Date): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ resetToken: token, resetTokenExpiry: expiry })
+      .where(eq(users.email, email))
+      .returning();
+    return result[0];
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.resetToken, token)).limit(1);
+    return result[0];
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ password: hashedPassword, resetToken: null, resetTokenExpiry: null })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
   async createExpense(insertExpense: InsertExpense): Promise<Expense> {
     const result = await db.insert(expenses).values(insertExpense).returning();
     return result[0];

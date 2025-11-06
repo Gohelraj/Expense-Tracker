@@ -1,88 +1,27 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
+import { Redirect, Link } from "wouter";
 import { Wallet } from "lucide-react";
-
-interface AuthResponse {
-    success: boolean;
-    user?: {
-        id: string;
-        username: string;
-    };
-    error?: string;
-}
 
 export default function Login() {
     const { toast } = useToast();
+    const { user, login, register } = useAuth();
+    const [isLoading, setIsLoading] = useState(false);
     const [loginData, setLoginData] = useState({ username: "", password: "" });
-    const [registerData, setRegisterData] = useState({ username: "", password: "", confirmPassword: "" });
+    const [registerData, setRegisterData] = useState({ username: "", email: "", password: "", confirmPassword: "" });
 
-    const loginMutation = useMutation({
-        mutationFn: async (data: { username: string; password: string }) => {
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || "Login failed");
-            }
-            return response.json() as Promise<AuthResponse>;
-        },
-        onSuccess: (data) => {
-            toast({
-                title: "Welcome back!",
-                description: `Logged in as ${data.user?.username}`,
-            });
-            // In a real app, you'd redirect or update global auth state here
-            window.location.href = "/";
-        },
-        onError: (error: Error) => {
-            toast({
-                title: "Login Failed",
-                description: error.message,
-                variant: "destructive",
-            });
-        },
-    });
+    // Redirect if already logged in
+    if (user) {
+        return <Redirect to="/" />;
+    }
 
-    const registerMutation = useMutation({
-        mutationFn: async (data: { username: string; password: string }) => {
-            const response = await fetch("/api/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || "Registration failed");
-            }
-            return response.json();
-        },
-        onSuccess: () => {
-            toast({
-                title: "Account Created",
-                description: "You can now log in with your credentials",
-            });
-            // Auto-login after registration
-            loginMutation.mutate({ username: registerData.username, password: registerData.password });
-        },
-        onError: (error: Error) => {
-            toast({
-                title: "Registration Failed",
-                description: error.message,
-                variant: "destructive",
-            });
-        },
-    });
-
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!loginData.username || !loginData.password) {
             toast({
@@ -92,12 +31,28 @@ export default function Login() {
             });
             return;
         }
-        loginMutation.mutate(loginData);
+
+        setIsLoading(true);
+        try {
+            await login(loginData.username, loginData.password);
+            toast({
+                title: "Welcome back!",
+                description: `Logged in as ${loginData.username}`,
+            });
+        } catch (error: any) {
+            toast({
+                title: "Login Failed",
+                description: error.message,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!registerData.username || !registerData.password) {
+        if (!registerData.username || !registerData.email || !registerData.password) {
             toast({
                 title: "Missing Fields",
                 description: "Please fill in all fields",
@@ -121,7 +76,23 @@ export default function Login() {
             });
             return;
         }
-        registerMutation.mutate({ username: registerData.username, password: registerData.password });
+
+        setIsLoading(true);
+        try {
+            await register(registerData.username, registerData.password, registerData.email);
+            toast({
+                title: "Account Created",
+                description: "Welcome to Expense Tracker!",
+            });
+        } catch (error: any) {
+            toast({
+                title: "Registration Failed",
+                description: error.message,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -161,7 +132,14 @@ export default function Login() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="login-password">Password</Label>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="login-password">Password</Label>
+                                            <Link href="/forgot-password">
+                                                <a className="text-sm text-primary hover:underline">
+                                                    Forgot password?
+                                                </a>
+                                            </Link>
+                                        </div>
                                         <Input
                                             id="login-password"
                                             type="password"
@@ -174,10 +152,10 @@ export default function Login() {
                                     <Button
                                         type="submit"
                                         className="w-full"
-                                        disabled={loginMutation.isPending}
+                                        disabled={isLoading}
                                         data-testid="button-login"
                                     >
-                                        {loginMutation.isPending ? "Logging in..." : "Login"}
+                                        {isLoading ? "Logging in..." : "Login"}
                                     </Button>
                                 </form>
                             </CardContent>
@@ -201,6 +179,17 @@ export default function Login() {
                                             value={registerData.username}
                                             onChange={(e) => setRegisterData({ ...registerData, username: e.target.value })}
                                             data-testid="input-register-username"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="register-email">Email</Label>
+                                        <Input
+                                            id="register-email"
+                                            type="email"
+                                            placeholder="Enter your email"
+                                            value={registerData.email}
+                                            onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                                            data-testid="input-register-email"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -228,10 +217,10 @@ export default function Login() {
                                     <Button
                                         type="submit"
                                         className="w-full"
-                                        disabled={registerMutation.isPending}
+                                        disabled={isLoading}
                                         data-testid="button-register"
                                     >
-                                        {registerMutation.isPending ? "Creating Account..." : "Create Account"}
+                                        {isLoading ? "Creating Account..." : "Create Account"}
                                     </Button>
                                 </form>
                             </CardContent>

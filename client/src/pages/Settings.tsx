@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BankPatternsManager from "@/components/BankPatternsManager";
-import CategoryManager from "@/components/CategoryManager";
+import GmailIntegration from "@/components/GmailIntegration";
+import EmailParserTest from "@/components/EmailParserTest";
 
 export default function Settings() {
   return (
@@ -12,18 +12,23 @@ export default function Settings() {
           <p className="text-muted-foreground mt-1">Manage your expense tracker configuration</p>
         </div>
 
-        <Tabs defaultValue="categories" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="banks">Bank Patterns</TabsTrigger>
+        <Tabs defaultValue="gmail" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+            <TabsTrigger value="gmail">Gmail Integration</TabsTrigger>
+            <TabsTrigger value="patterns">Bank Patterns</TabsTrigger>
+            <TabsTrigger value="test">Test Parser</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="categories" className="mt-6">
-            <CategoryManager />
+          <TabsContent value="gmail" className="mt-6">
+            <GmailIntegration />
           </TabsContent>
 
-          <TabsContent value="banks" className="mt-6">
+          <TabsContent value="patterns" className="mt-6">
             <BankPatternsManager />
+          </TabsContent>
+
+          <TabsContent value="test" className="mt-6">
+            <EmailParserTest />
           </TabsContent>
         </Tabs>
       </div>

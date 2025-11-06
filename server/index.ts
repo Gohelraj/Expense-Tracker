@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { emailPollingService } from "./email-polling-service";
+import { emailService } from "./email-service";
 
 const app = express();
 
@@ -75,6 +76,11 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen(port, () => {
     log(`serving on port ${port}`);
+
+    // Initialize email service for password resets
+    emailService.initialize().catch(err => {
+      console.error('Failed to initialize email service:', err);
+    });
 
     // Start email polling service with configurable interval
     emailPollingService.start().catch(err => {

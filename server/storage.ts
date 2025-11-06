@@ -8,7 +8,11 @@ import { dbStorage } from "./db-storage";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserResetToken(email: string, token: string, expiry: Date): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
 
   // Expense methods
   createExpense(expense: InsertExpense): Promise<Expense>;
@@ -69,9 +73,50 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = {
+      ...insertUser,
+      id,
+      email: insertUser.email || null,
+      resetToken: null,
+      resetTokenExpiry: null
+    };
     this.users.set(id, user);
     return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.email === email,
+    );
+  }
+
+  async updateUserResetToken(email: string, token: string, expiry: Date): Promise<User | undefined> {
+    const user = await this.getUserByEmail(email);
+    if (!user) return undefined;
+
+    const updated: User = { ...user, resetToken: token, resetTokenExpiry: expiry };
+    this.users.set(user.id, updated);
+    return updated;
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.resetToken === token,
+    );
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+
+    const updated: User = {
+      ...user,
+      password: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null
+    };
+    this.users.set(id, updated);
+    return updated;
   }
 
   async createExpense(insertExpense: InsertExpense): Promise<Expense> {
@@ -171,6 +216,64 @@ export class MemStorage implements IStorage {
       emailId,
       processedAt: new Date(),
     };
+  }
+
+  async createBankPattern(bankPattern: InsertBankPattern): Promise<BankPattern> {
+    const id = randomUUID();
+    return {
+      ...bankPattern,
+      id,
+      isActive: bankPattern.isActive || 'true',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  async getBankPatterns(): Promise<BankPattern[]> {
+    return [];
+  }
+
+  async getBankPatternById(id: string): Promise<BankPattern | undefined> {
+    return undefined;
+  }
+
+  async updateBankPattern(id: string, updates: Partial<InsertBankPattern>): Promise<BankPattern | undefined> {
+    return undefined;
+  }
+
+  async deleteBankPattern(id: string): Promise<boolean> {
+    return false;
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const id = randomUUID();
+    return {
+      ...category,
+      id,
+      isActive: category.isActive || 'true',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  async getCategories(): Promise<Category[]> {
+    return [];
+  }
+
+  async getCategoryById(id: string): Promise<Category | undefined> {
+    return undefined;
+  }
+
+  async getCategoryByName(name: string): Promise<Category | undefined> {
+    return undefined;
+  }
+
+  async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category | undefined> {
+    return undefined;
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    return false;
   }
 }
 
