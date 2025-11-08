@@ -94,6 +94,7 @@ A modern, full-featured expense tracking application with email integration, bud
 | `npm run check` | TypeScript type checking |
 | `npm run db:push` | Push database schema changes |
 | `npm run db:seed` | Seed default categories and bank patterns |
+| `npm run db:migrate-users` | Migrate existing transactions to multi-user support |
 
 ## 🔧 Configuration
 
@@ -108,6 +109,16 @@ Update your `DATABASE_URL` in `.env`:
 ```
 DATABASE_URL=postgres://username:password@host:5432/database
 ```
+
+#### Migrating from Single-User to Multi-User
+
+If you're upgrading from a version before commit `11c01195` (which added multi-user support), you'll need to migrate existing transactions:
+
+```bash
+npm run db:migrate-users
+```
+
+This will assign all existing transactions to the first user in your database. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for details.
 
 ### Gmail Integration (Optional)
 

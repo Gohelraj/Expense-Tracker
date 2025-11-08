@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx server/seed-defaults.ts"
+    "db:seed": "tsx server/seed-defaults.ts",
+    "db:migrate-users": "tsx server/migrate-expenses-to-user.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
