@@ -12,6 +12,24 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint (for uptime monitoring)
+  app.get("/health", (req, res) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
+  // Alternative health endpoint
+  app.get("/api/health", (req, res) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
   // Authentication routes
 
   // Register
