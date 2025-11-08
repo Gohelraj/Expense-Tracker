@@ -15,20 +15,20 @@ export interface IStorage {
   updateUserPassword(id: string, hashedPassword: string): Promise<User | undefined>;
 
   // Expense methods
-  createExpense(expense: InsertExpense, userId: string): Promise<Expense>;
-  getExpenses(userId: string): Promise<Expense[]>;
-  getExpenseById(id: string, userId: string): Promise<Expense | undefined>;
-  updateExpense(id: string, userId: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
-  deleteExpense(id: string, userId: string): Promise<boolean>;
-  getExpensesByDateRange(startDate: Date, endDate: Date, userId: string): Promise<Expense[]>;
-  getExpensesByCategory(category: string, userId: string): Promise<Expense[]>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  getExpenses(): Promise<Expense[]>;
+  getExpenseById(id: string): Promise<Expense | undefined>;
+  updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
+  deleteExpense(id: string): Promise<boolean>;
+  getExpensesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]>;
+  getExpensesByCategory(category: string): Promise<Expense[]>;
 
   // Budget methods
-  createBudget(budget: InsertBudget, userId: string): Promise<Budget>;
-  getBudgets(userId: string): Promise<Budget[]>;
-  getBudgetByCategory(category: string, userId: string): Promise<Budget | undefined>;
-  updateBudget(category: string, userId: string, amount: string): Promise<Budget | undefined>;
-  deleteBudget(category: string, userId: string): Promise<boolean>;
+  createBudget(budget: InsertBudget): Promise<Budget>;
+  getBudgets(): Promise<Budget[]>;
+  getBudgetByCategory(category: string): Promise<Budget | undefined>;
+  updateBudget(category: string, amount: string): Promise<Budget | undefined>;
+  deleteBudget(category: string): Promise<boolean>;
 
   // Processed Email methods
   isEmailProcessed(emailId: string): Promise<boolean>;
@@ -119,12 +119,11 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async createExpense(insertExpense: InsertExpense, userId: string): Promise<Expense> {
+  async createExpense(insertExpense: InsertExpense): Promise<Expense> {
     const id = randomUUID();
     const expense: Expense = {
       ...insertExpense,
       id,
-      userId,
       date: insertExpense.date || new Date(),
       source: insertExpense.source || 'manual',
       emailId: insertExpense.emailId || null,
@@ -134,83 +133,74 @@ export class MemStorage implements IStorage {
     return expense;
   }
 
-  async getExpenses(userId: string): Promise<Expense[]> {
-    return Array.from(this.expenses.values())
-      .filter(expense => expense.userId === userId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  async getExpenses(): Promise<Expense[]> {
+    return Array.from(this.expenses.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
   }
 
-  async getExpenseById(id: string, userId: string): Promise<Expense | undefined> {
-    const expense = this.expenses.get(id);
-    return expense && expense.userId === userId ? expense : undefined;
+  async getExpenseById(id: string): Promise<Expense | undefined> {
+    return this.expenses.get(id);
   }
 
-  async updateExpense(id: string, userId: string, updates: Partial<InsertExpense>): Promise<Expense | undefined> {
+  async updateExpense(id: string, updates: Partial<InsertExpense>): Promise<Expense | undefined> {
     const expense = this.expenses.get(id);
-    if (!expense || expense.userId !== userId) return undefined;
+    if (!expense) return undefined;
 
     const updated: Expense = { ...expense, ...updates };
     this.expenses.set(id, updated);
     return updated;
   }
 
-  async deleteExpense(id: string, userId: string): Promise<boolean> {
-    const expense = this.expenses.get(id);
-    if (!expense || expense.userId !== userId) return false;
+  async deleteExpense(id: string): Promise<boolean> {
     return this.expenses.delete(id);
   }
 
-  async getExpensesByDateRange(startDate: Date, endDate: Date, userId: string): Promise<Expense[]> {
+  async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]> {
     return Array.from(this.expenses.values())
       .filter(expense => {
         const expenseDate = new Date(expense.date);
-        return expense.userId === userId && expenseDate >= startDate && expenseDate <= endDate;
+        return expenseDate >= startDate && expenseDate <= endDate;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  async getExpensesByCategory(category: string, userId: string): Promise<Expense[]> {
+  async getExpensesByCategory(category: string): Promise<Expense[]> {
     return Array.from(this.expenses.values())
-      .filter(expense => expense.userId === userId && expense.category === category)
+      .filter(expense => expense.category === category)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  async createBudget(insertBudget: InsertBudget, userId: string): Promise<Budget> {
+  async createBudget(insertBudget: InsertBudget): Promise<Budget> {
     const id = randomUUID();
     const budget: Budget = {
       ...insertBudget,
       id,
-      userId,
       updatedAt: new Date(),
     };
-    const key = `${userId}-${insertBudget.category}`;
-    this.budgets.set(key, budget);
+    this.budgets.set(budget.category, budget);
     return budget;
   }
 
-  async getBudgets(userId: string): Promise<Budget[]> {
-    return Array.from(this.budgets.values())
-      .filter(budget => budget.userId === userId);
+  async getBudgets(): Promise<Budget[]> {
+    return Array.from(this.budgets.values());
   }
 
-  async getBudgetByCategory(category: string, userId: string): Promise<Budget | undefined> {
-    const key = `${userId}-${category}`;
-    return this.budgets.get(key);
+  async getBudgetByCategory(category: string): Promise<Budget | undefined> {
+    return this.budgets.get(category);
   }
 
-  async updateBudget(category: string, userId: string, amount: string): Promise<Budget | undefined> {
-    const key = `${userId}-${category}`;
-    const budget = this.budgets.get(key);
+  async updateBudget(category: string, amount: string): Promise<Budget | undefined> {
+    const budget = this.budgets.get(category);
     if (!budget) return undefined;
 
     const updated: Budget = { ...budget, amount, updatedAt: new Date() };
-    this.budgets.set(key, updated);
+    this.budgets.set(category, updated);
     return updated;
   }
 
-  async deleteBudget(category: string, userId: string): Promise<boolean> {
-    const key = `${userId}-${category}`;
-    return this.budgets.delete(key);
+  async deleteBudget(category: string): Promise<boolean> {
+    return this.budgets.delete(category);
   }
 
   async isEmailProcessed(emailId: string): Promise<boolean> {

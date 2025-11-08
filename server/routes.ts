@@ -8,7 +8,6 @@ import { gmailService } from "./gmail-service";
 import { emailPollingService } from "./email-polling-service";
 import { budgetAlertsService } from "./budget-alerts";
 import { emailService } from "./email-service";
-import { requireAuth, getCurrentUserId } from "./auth-middleware";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -37,11 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({
         username: result.data.username,
         password: hashedPassword,
-        email: result.data.email,
       });
-
-      // Set session
-      req.session.userId = user.id;
 
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
@@ -71,9 +66,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      // Set session
-      req.session.userId = user.id;
-
       // Don't send password back
       const { password: _, ...userWithoutPassword } = user;
 
@@ -88,28 +80,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Logout
   app.post("/api/auth/logout", async (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("Session destruction error:", err);
-      }
-    });
     res.json({ success: true });
   });
 
   // Get current user
   app.get("/api/auth/me", async (req, res) => {
-    const userId = getCurrentUserId(req);
-    if (!userId) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const { password, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    // For now, return a mock user since we don't have session management yet
+    res.json({
+      id: "demo-user",
+      username: "demo"
+    });
   });
 
   // Forgot password
@@ -228,9 +208,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Expense routes
 
   // Create expense
-  app.post("/api/expenses", requireAuth, async (req, res) => {
+  app.post("/api/expenses", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       const result = insertExpenseSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({
@@ -238,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const expense = await storage.createExpense(result.data, userId);
+      const expense = await storage.createExpense(result.data);
       res.status(201).json(expense);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -246,10 +225,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all expenses
-  app.get("/api/expenses", requireAuth, async (req, res) => {
+  app.get("/api/expenses", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const expenses = await storage.getExpenses(userId);
+      const expenses = await storage.getExpenses();
       res.json(expenses);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -257,10 +235,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get expense by ID
-  app.get("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.get("/api/expenses/:id", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const expense = await storage.getExpenseById(req.params.id, userId);
+      const expense = await storage.getExpenseById(req.params.id);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
       }
@@ -271,9 +248,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update expense
-  app.patch("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.patch("/api/expenses/:id", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       // Validate the update data (partial schema validation)
       const updateData = {
         ...req.body,
@@ -281,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: req.body.date ? new Date(req.body.date) : undefined,
       };
 
-      const expense = await storage.updateExpense(req.params.id, userId, updateData);
+      const expense = await storage.updateExpense(req.params.id, updateData);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
       }
@@ -292,9 +268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update expense (PUT method for full update)
-  app.put("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.put("/api/expenses/:id", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       // Validate the update data (partial schema validation)
       const updateData = {
         ...req.body,
@@ -302,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: req.body.date ? new Date(req.body.date) : undefined,
       };
 
-      const expense = await storage.updateExpense(req.params.id, userId, updateData);
+      const expense = await storage.updateExpense(req.params.id, updateData);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
       }
@@ -313,10 +288,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete expense
-  app.delete("/api/expenses/:id", requireAuth, async (req, res) => {
+  app.delete("/api/expenses/:id", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const deleted = await storage.deleteExpense(req.params.id, userId);
+      const deleted = await storage.deleteExpense(req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Expense not found" });
       }
@@ -327,9 +301,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk delete expenses
-  app.post("/api/expenses/bulk-delete", requireAuth, async (req, res) => {
+  app.post("/api/expenses/bulk-delete", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       const { ids } = req.body;
 
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -337,7 +310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const results = await Promise.all(
-        ids.map(id => storage.deleteExpense(id, userId))
+        ids.map(id => storage.deleteExpense(id))
       );
 
       const deletedCount = results.filter(Boolean).length;
@@ -353,10 +326,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get expenses by category
-  app.get("/api/expenses/category/:category", requireAuth, async (req, res) => {
+  app.get("/api/expenses/category/:category", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const expenses = await storage.getExpensesByCategory(req.params.category, userId);
+      const expenses = await storage.getExpensesByCategory(req.params.category);
       res.json(expenses);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -364,20 +336,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export expenses as CSV
-  app.get("/api/expenses/export/csv", requireAuth, async (req, res) => {
+  app.get("/api/expenses/export/csv", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       const { startDate, endDate } = req.query;
 
       let expenses;
       if (startDate && endDate) {
         expenses = await storage.getExpensesByDateRange(
           new Date(startDate as string),
-          new Date(endDate as string),
-          userId
+          new Date(endDate as string)
         );
       } else {
-        expenses = await storage.getExpenses(userId);
+        expenses = await storage.getExpenses();
       }
 
       // Generate CSV
@@ -408,10 +378,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get statistics
-  app.get("/api/expenses/stats/summary", requireAuth, async (req, res) => {
+  app.get("/api/expenses/stats/summary", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const expenses = await storage.getExpenses(userId);
+      const expenses = await storage.getExpenses();
 
       // Calculate statistics
       const now = new Date();
@@ -447,9 +416,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Budget routes
 
   // Create or update budget
-  app.post("/api/budgets", requireAuth, async (req, res) => {
+  app.post("/api/budgets", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       const result = insertBudgetSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({
@@ -457,14 +425,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const existing = await storage.getBudgetByCategory(result.data.category, userId);
+      const existing = await storage.getBudgetByCategory(result.data.category);
 
       if (existing) {
-        const updated = await storage.updateBudget(result.data.category, userId, result.data.amount);
+        const updated = await storage.updateBudget(result.data.category, result.data.amount);
         return res.json(updated);
       }
 
-      const budget = await storage.createBudget(result.data, userId);
+      const budget = await storage.createBudget(result.data);
       res.status(201).json(budget);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -472,10 +440,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all budgets
-  app.get("/api/budgets", requireAuth, async (req, res) => {
+  app.get("/api/budgets", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const budgets = await storage.getBudgets(userId);
+      const budgets = await storage.getBudgets();
       res.json(budgets);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -483,10 +450,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get budget by category
-  app.get("/api/budgets/:category", requireAuth, async (req, res) => {
+  app.get("/api/budgets/:category", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const budget = await storage.getBudgetByCategory(req.params.category, userId);
+      const budget = await storage.getBudgetByCategory(req.params.category);
       if (!budget) {
         return res.status(404).json({ error: "Budget not found" });
       }
@@ -497,10 +463,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete budget
-  app.delete("/api/budgets/:category", requireAuth, async (req, res) => {
+  app.delete("/api/budgets/:category", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const deleted = await storage.deleteBudget(req.params.category, userId);
+      const deleted = await storage.deleteBudget(req.params.category);
       if (!deleted) {
         return res.status(404).json({ error: "Budget not found" });
       }
@@ -511,10 +476,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get budget alerts
-  app.get("/api/budgets/alerts/status", requireAuth, async (req, res) => {
+  app.get("/api/budgets/alerts/status", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
-      const status = await budgetAlertsService.getBudgetStatus(userId);
+      const status = await budgetAlertsService.getBudgetStatus();
       res.json(status);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -553,9 +517,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Parse email and create expense
-  app.post("/api/email/parse-and-create", requireAuth, async (req, res) => {
+  app.post("/api/email/parse-and-create", async (req, res) => {
     try {
-      const userId = getCurrentUserId(req)!;
       const { subject, body, sender, emailId } = req.body;
 
       if (!subject || !body || !sender) {
@@ -586,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const expense = await storage.createExpense(result.data, userId);
+      const expense = await storage.createExpense(result.data);
 
       res.json({
         success: true,

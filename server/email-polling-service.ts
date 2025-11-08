@@ -79,12 +79,17 @@ export class EmailPollingService {
         const parsed = emailParser.parseEmail(email.subject, email.body, email.from, email.date);
 
         if (parsed) {
-          // TODO: Email polling needs to be user-specific
-          // For now, skip automatic expense creation from polling
-          // Users can manually parse emails via the parse-and-create endpoint
+          // Create expense from parsed email
+          const expense = emailParser.toExpense(parsed);
 
-          // Mark email as processed to avoid reprocessing
           try {
+            await storage.createExpense({
+              ...expense,
+              source: 'email',
+              emailId: email.id,
+            });
+
+            // Mark email as processed
             await storage.markEmailAsProcessed(email.id);
             createdCount++;
 
