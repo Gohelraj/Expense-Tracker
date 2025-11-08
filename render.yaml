@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: expense-tracker
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: expense-tracker-db
+          property: connectionString
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: APP_URL
+        value: https://expense-tracker.onrender.com
+      - key: EMAIL_SYNC_INITIAL_DAYS
+        value: 7
+      - key: EMAIL_SYNC_INTERVAL_MINUTES
+        value: 5
+      - key: EMAIL_SYNC_BATCH_SIZE
+        value: 50
+      - key: EMAIL_SYNC_INITIAL_BATCH_SIZE
+        value: 200
+
+databases:
+  - name: expense-tracker-db
+    plan: free
+    databaseName: expense_tracker
+    user: expense_tracker_user

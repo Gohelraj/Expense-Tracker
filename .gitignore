@@ -13,3 +13,6 @@ vite.config.ts.*
 *.zip
 .replit
 replit.nix
+.env
+*.log
+.vite
