@@ -12,15 +12,26 @@ export class EmailParser {
   private indianBankPatterns = {
     amount: [
       /(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.[0-9]{2})?)/i,
-      /(?:debited|spent|payment|transaction)\s+(?:of\s+)?(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
-      /amount:\s*(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /(?:debited|spent|payment|transaction|charged|withdrawn|purchase)\s+(?:of\s+)?(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /amount[:\s]*(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /(?:txn|transaction)\s+(?:amt|amount)[:\s]*(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+      /(?:purchase|sale)\s+(?:of\s+)?(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
     ],
     merchant: [
       // Card transaction patterns (most specific first - based on real emails)
       /Merchant\s+Name[:\s]*([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s|$)/i, // "Merchant Name: AMAZON BD"
       /spent.*?(?:at|on).*?(?:card|ending).*?(?:at|with)\s+([A-Z][A-Z0-9\s&'._-]{2,30})(?:\s+on|\s+at|$)/i, // "spent on card at MERCHANT"
-      /has\s+been\s+spent.*?at\s+([A-Z][A-Z0-9\s&'._-]{2,30})(?:\s+on|\s+at|$)/i, // "has been spent at UPI_ZEPTONOW"
+      /has\s+been\s+(?:spent|debited|charged).*?(?:at|on)\s+([A-Z][A-Z0-9\s&'._-]{2,30})(?:\s+on|\s+at|$)/i, // "has been spent at MERCHANT"
       /spent\s+on.*?card.*?at\s+([A-Z][A-Z0-9\s&'._-]{2,30})(?:\s|$)/i, // "spent on credit card at MERCHANT"
+
+      // Credit card specific patterns
+      /(?:purchase|transaction)\s+at\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s+on|\s+for|\.|\n|$)/i,
+      /(?:charged|debited)\s+(?:from|on)\s+.*?card.*?(?:at|for)\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|\.|\n|$)/i,
+      /card\s+ending\s+\d{4}.*?(?:at|for)\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|\.|\n|$)/i,
+
+      // Third-party payment services (PayPal, Stripe, Razorpay, etc.)
+      /(?:via|through|using)\s+(paypal|stripe|razorpay|paytm|phonepe|gpay|amazon\s+pay).*?(?:for|to)\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|\.|\n|$)/i,
+      /payment\s+to\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})\s+(?:via|through|using)\s+(?:paypal|stripe|razorpay)/i,
 
       // UPI Transaction Info patterns
       /UPI\/P2M\/\d+\/([A-Z\s&'.-]+?)(?:\s|$)/i,  // UPI/P2M/number/MERCHANT_NAME
@@ -28,19 +39,23 @@ export class EmailParser {
       /UPI.*?\/([A-Z][A-Z\s&'.-]{2,30})(?:\s|$)/i, // Generic UPI pattern
 
       // Transaction Info field patterns
-      /Transaction\s+Info[:\s]*([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s|$)/i,
+      /Transaction\s+(?:Info|Details)[:\s]*([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
+      /(?:Txn|Transaction)\s+(?:at|with)[:\s]*([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
 
       // Merchant/Payee field patterns
-      /(?:merchant|payee)[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s+(?:payment|mode|on|dated)|\.|\n|$)/i,
+      /(?:merchant|payee|vendor)[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s+(?:payment|mode|on|dated)|\.|\n|$)/i,
 
       // Payment patterns
-      /(?:payment|paid|debited)\s+(?:at|to)\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s+(?:on|dated|for)|\.|\n|$)/i,
+      /(?:payment|paid|debited|withdrawn)\s+(?:at|to|from)\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s+(?:on|dated|for)|\.|\n|$)/i,
 
       // Generic card patterns
-      /(?:card|used)\s+at\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s+(?:on|dated)|\.|\n|$)/i,
+      /(?:card|used)\s+at\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s+(?:on|dated)|\.|\n|$)/i,
+
+      // POS and online transaction patterns
+      /(?:POS|online)\s+(?:transaction|purchase)\s+at\s+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|\.|\n|$)/i,
 
       // Beneficiary patterns
-      /beneficiary[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s|$)/i,
+      /beneficiary[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
     ],
     date: [
       // DD-MM-YYYY or DD/MM/YYYY formats
@@ -54,8 +69,10 @@ export class EmailParser {
       /(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\s+(?:at|\d{1,2}:)/i,
     ],
     paymentMethod: [
-      /(?:using|via|through|card)\s+(credit card|debit card|upi|net banking|wallet)/i,
-      /(?:Card\s+ending|Card\s+\*+)(\d{4})/i,
+      /(?:using|via|through|on|from)\s+(credit card|debit card|upi|net banking|wallet|paypal|stripe|razorpay)/i,
+      /(?:Card\s+ending|Card\s+\*+|card\s+no\.)(\d{4})/i,
+      /(credit|debit)\s+card\s+ending/i,
+      /(?:POS|online|contactless)\s+transaction/i,
     ],
   };
 
@@ -81,15 +98,26 @@ export class EmailParser {
       return null;
     }
 
+    // Check if this is a debit transaction
+    const isDebitTransaction = this.isDebitTransaction(text);
+
     const amount = this.extractAmount(text);
     const merchant = this.extractMerchant(text);
     const transactionDate = this.extractDate(text);
 
-    if (!amount || !merchant) {
+    // If we have an amount and it's clearly a debit, proceed even without merchant
+    if (!amount) {
       return null;
     }
 
-    const category = this.categorizeTransaction(merchant, text);
+    // If no merchant found but we have amount and debit indicators, use fallback
+    const finalMerchant = merchant || (isDebitTransaction ? 'Debit Transaction' : null);
+
+    if (!finalMerchant) {
+      return null;
+    }
+
+    const category = this.categorizeTransaction(finalMerchant, text);
     const paymentMethod = this.extractPaymentMethod(text);
 
     // Use transaction date from email content, fallback to email date, then current date
@@ -97,7 +125,7 @@ export class EmailParser {
 
     return {
       amount,
-      merchant,
+      merchant: finalMerchant,
       date: finalDate,
       category,
       paymentMethod,
@@ -106,6 +134,7 @@ export class EmailParser {
 
   private isBankEmail(sender: string): boolean {
     const bankDomains = [
+      // Indian Banks
       'hdfcbank',
       'icicibank',
       'sbi',
@@ -115,11 +144,36 @@ export class EmailParser {
       'indusind',
       'pnb',
       'bob',
+      'idbi',
+      'unionbank',
+      'canarabank',
+      'bankofbaroda',
+      // Payment Services
       'paytm',
       'phonepe',
       'gpay',
+      'googlepay',
+      'amazonpay',
+      'mobikwik',
+      'freecharge',
+      // Third-party Payment Processors
+      'paypal',
+      'stripe',
+      'razorpay',
+      'instamojo',
+      'cashfree',
+      'payu',
+      // Credit Card Companies
+      'visa',
+      'mastercard',
+      'amex',
+      'americanexpress',
+      'rupay',
+      // Generic patterns
       'alerts',
       'notification',
+      'transaction',
+      'banking',
     ];
 
     return bankDomains.some(domain => sender.toLowerCase().includes(domain));
@@ -159,10 +213,11 @@ export class EmailParser {
 
     // Fallback patterns for other formats
     const fallbackPatterns = [
-      /payee[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s|$)/i,
-      /beneficiary[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s|$)/i,
-      /merchant\s+name[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,30})(?:\s|$)/i,
-      /to[:\s]+([A-Z][A-Z\s&'.-]{2,30})(?:\s+on|\s+dated|$)/i,
+      /payee[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
+      /beneficiary[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
+      /merchant\s+name[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
+      /to[:\s]+([A-Z][A-Z\s&'.-]{2,40})(?:\s+on|\s+dated|$)/i,
+      /(?:paid|payment)\s+to[:\s]+([A-Za-z][A-Za-z0-9\s&'.-]{2,40})(?:\s|$)/i,
     ];
 
     for (const pattern of fallbackPatterns) {
@@ -176,7 +231,8 @@ export class EmailParser {
       }
     }
 
-    return 'Unknown Merchant';
+    // Return null instead of 'Unknown Merchant' - let the caller decide
+    return null;
   }
 
   private cleanMerchantName(merchant: string): string {
@@ -188,13 +244,23 @@ export class EmailParser {
     // Common merchant name mappings
     const merchantMappings: { [key: string]: string } = {
       'AMAZON BD': 'Amazon',
+      'AMAZON': 'Amazon',
       'FLIPKART PAYMENTS': 'Flipkart',
+      'FLIPKART': 'Flipkart',
       'ZEPTONOW': 'Zepto',
       'SWIGGY': 'Swiggy',
       'ZOMATO': 'Zomato',
       'PAYTM': 'Paytm',
       'PHONEPE': 'PhonePe',
       'GPAY': 'Google Pay',
+      'GOOGLE PAY': 'Google Pay',
+      'NETFLIX': 'Netflix',
+      'SPOTIFY': 'Spotify',
+      'UBER': 'Uber',
+      'OLA': 'Ola',
+      'BIGBASKET': 'BigBasket',
+      'BLINKIT': 'Blinkit',
+      'MYNTRA': 'Myntra',
     };
 
     // Check for exact matches first
@@ -204,10 +270,10 @@ export class EmailParser {
     }
 
     // Remove common suffixes and prefixes
-    merchant = merchant.replace(/\s*(PAYMENTS?|PVT\s*LTD|LIMITED|LTD|INDIA|SERVICES?|BD)\s*$/i, '');
+    merchant = merchant.replace(/\s*(PAYMENTS?|PVT\s*LTD|LIMITED|LTD|INDIA|SERVICES?|BD|INC|CORP|LLC)\s*$/i, '');
 
-    // Replace underscores with spaces
-    merchant = merchant.replace(/_/g, ' ');
+    // Replace underscores and hyphens with spaces
+    merchant = merchant.replace(/[_-]/g, ' ');
 
     // Remove special characters except common ones
     merchant = merchant.replace(/[^\w\s&'.-]/g, '');
@@ -280,6 +346,8 @@ export class EmailParser {
   }
 
   private extractPaymentMethod(text: string): string {
+    const lowerText = text.toLowerCase();
+
     for (const pattern of this.indianBankPatterns.paymentMethod) {
       const match = text.match(pattern);
       if (match && match[1]) {
@@ -289,13 +357,44 @@ export class EmailParser {
         if (method.includes('upi')) return 'UPI';
         if (method.includes('net banking')) return 'Net Banking';
         if (method.includes('wallet')) return 'Wallet';
+        if (method.includes('paypal')) return 'PayPal';
+        if (method.includes('stripe')) return 'Stripe';
+        if (method.includes('razorpay')) return 'Razorpay';
       }
     }
 
-    if (text.toLowerCase().includes('upi')) return 'UPI';
-    if (text.toLowerCase().includes('card')) return 'Card';
+    // Enhanced detection for various payment methods
+    if (lowerText.includes('credit card') || lowerText.includes('cc ending')) return 'Credit Card';
+    if (lowerText.includes('debit card') || lowerText.includes('dc ending')) return 'Debit Card';
+    if (lowerText.includes('upi')) return 'UPI';
+    if (lowerText.includes('net banking') || lowerText.includes('netbanking')) return 'Net Banking';
+    if (lowerText.includes('wallet')) return 'Wallet';
+    if (lowerText.includes('paypal')) return 'PayPal';
+    if (lowerText.includes('stripe')) return 'Stripe';
+    if (lowerText.includes('razorpay')) return 'Razorpay';
+    if (lowerText.includes('pos transaction') || lowerText.includes('pos purchase')) return 'Card';
+    if (lowerText.includes('online transaction') || lowerText.includes('online purchase')) return 'Online';
+    if (lowerText.includes('contactless')) return 'Contactless Card';
+    if (lowerText.includes('card')) return 'Card';
 
     return 'Other';
+  }
+
+  private isDebitTransaction(text: string): boolean {
+    const lowerText = text.toLowerCase();
+
+    const debitIndicators = [
+      /debited|spent|charged|withdrawn|purchase|payment.*made/i,
+      /debit.*from.*account/i,
+      /transaction.*at/i,
+      /amount.*debited/i,
+      /has.*been.*debited/i,
+      /your.*account.*debited/i,
+      /card.*charged/i,
+      /payment.*of.*(?:inr|rs|₹)/i,
+    ];
+
+    return debitIndicators.some(pattern => pattern.test(lowerText));
   }
 
   private isCreditTransaction(text: string): boolean {
@@ -306,7 +405,14 @@ export class EmailParser {
       /credited|received|deposited|refund|cashback|reward|salary|transfer.*received/i,
       /amount.*credited/i,
       /received.*from/i,
+      /credit.*to.*account/i,
+      /money.*received/i,
     ];
+
+    // Don't skip if it's clearly a debit/expense even if "credit card" is mentioned
+    if (this.isDebitTransaction(text)) {
+      return false;
+    }
 
     return creditPatterns.some(pattern => pattern.test(lowerText));
   }
