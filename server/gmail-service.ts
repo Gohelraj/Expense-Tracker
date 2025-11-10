@@ -40,11 +40,26 @@ export class GmailService {
       });
 
       this.gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-      console.log('Gmail service initialized successfully');
 
-      return true;
+      // Validate the refresh token by making a test API call
+      try {
+        await this.gmail.users.getProfile({ userId: 'me' });
+        console.log('Gmail service initialized successfully');
+        return true;
+      } catch (error: any) {
+        // Check for authentication errors
+        if (error.code === 401 || error.message?.includes('invalid_grant')) {
+          console.error('❌ Gmail refresh token is invalid or expired.');
+          console.error('Please re-authenticate by following the steps in GMAIL_SETUP.md');
+          this.gmail = null;
+          return false;
+        }
+        // Re-throw other errors
+        throw error;
+      }
     } catch (error) {
       console.error('Failed to initialize Gmail service:', error);
+      this.gmail = null;
       return false;
     }
   }

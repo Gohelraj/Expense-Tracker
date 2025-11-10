@@ -503,6 +503,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send budget alert email
+  app.post("/api/budgets/alerts/send", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email address is required" });
+      }
+
+      const sent = await budgetAlertsService.sendBudgetAlerts(email);
+
+      if (!sent) {
+        return res.json({
+          success: false,
+          message: "No alerts to send or email service not configured"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Budget alerts sent successfully"
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Email integration routes
 
   // Test email parsing

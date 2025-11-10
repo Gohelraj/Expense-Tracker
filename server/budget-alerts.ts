@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { emailService } from "./email-service";
 
 interface BudgetAlert {
     category: string;
@@ -9,6 +10,9 @@ interface BudgetAlert {
 }
 
 export class BudgetAlertsService {
+    private lastAlertSent: Date | null = null;
+    private readonly ALERT_COOLDOWN_HOURS = 24; // Send alerts max once per day
+
     async checkBudgetAlerts(): Promise<BudgetAlert[]> {
         const alerts: BudgetAlert[] = [];
 
@@ -72,6 +76,45 @@ export class BudgetAlertsService {
                 exceeded: alerts.filter(a => a.severity === 'exceeded').length,
             },
         };
+    }
+
+    async sendBudgetAlerts(userEmail: string): Promise<boolean> {
+        // Check cooldown
+        if (this.lastAlertSent) {
+            const hoursSinceLastAlert = (Date.now() - this.lastAlertSent.getTime()) / (1000 * 60 * 60);
+            if (hoursSinceLastAlert < this.ALERT_COOLDOWN_HOURS) {
+                console.log(`Budget alert cooldown active. ${this.ALERT_COOLDOWN_HOURS - hoursSinceLastAlert} hours remaining.`);
+                return false;
+            }
+        }
+
+        const alerts = await this.checkBudgetAlerts();
+
+        if (alerts.length === 0) {
+            console.log('No budget alerts to send');
+            return false;
+        }
+
+        if (!emailService.isInitialized()) {
+            console.error('Email service not initialized. Cannot send budget alerts.');
+            return false;
+        }
+
+        try {
+            const sent = await emailService.sendBudgetAlertEmail(userEmail, alerts);
+            if (sent) {
+                this.lastAlertSent = new Date();
+                console.log(`Budget alerts sent to ${userEmail}`);
+            }
+            return sent;
+        } catch (error) {
+            console.error('Failed to send budget alerts:', error);
+            return false;
+        }
+    }
+
+    async checkAndSendAlerts(userEmail: string): Promise<void> {
+        await this.sendBudgetAlerts(userEmail);
     }
 }
 
