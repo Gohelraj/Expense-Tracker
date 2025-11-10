@@ -210,52 +210,54 @@ export default function Transactions() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Transactions</h1>
-          <p className="text-muted-foreground mt-1">View and manage all your expenses</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Transactions</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">View and manage all your expenses</p>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={searchInputRef}
-                placeholder="Search by merchant or notes (Ctrl+K)..."
+                placeholder="Search (Ctrl+K)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 text-sm"
                 data-testid="input-search-transactions"
               />
             </div>
 
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-48" data-testid="select-category-filter">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {uniqueCategories.map(cat => (
-                  <SelectItem key={cat} value={cat.toLowerCase()}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 sm:flex gap-2">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-40" data-testid="select-category-filter">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {uniqueCategories.map(cat => (
+                    <SelectItem key={cat} value={cat.toLowerCase()}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full md:w-48" data-testid="select-sort">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date">Date</SelectItem>
-                <SelectItem value="amount">Amount</SelectItem>
-                <SelectItem value="category">Category</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full sm:w-40" data-testid="select-sort">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="amount">Amount</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
+          <div className="flex flex-col gap-3">
+            <div className="w-full">
               <label className="text-sm font-medium mb-2 flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Date Range
@@ -276,40 +278,42 @@ export default function Transactions() {
             </div>
 
             {dateRange === "custom" && (
-              <>
-                <div className="flex-1">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div>
                   <label className="text-sm font-medium mb-2 block">Start Date</label>
                   <Input
                     type="date"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
                     data-testid="input-start-date"
+                    className="text-sm"
                   />
                 </div>
-                <div className="flex-1">
+                <div>
                   <label className="text-sm font-medium mb-2 block">End Date</label>
                   <Input
                     type="date"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
                     data-testid="input-end-date"
+                    className="text-sm"
                   />
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <Checkbox
                   checked={selectedIds.size === filteredAndSortedExpenses.length && filteredAndSortedExpenses.length > 0}
                   onCheckedChange={handleSelectAll}
                   data-testid="checkbox-select-all"
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {selectedIds.size > 0
                     ? `${selectedIds.size} selected`
                     : `${filteredAndSortedExpenses.length} transactions`}
@@ -323,8 +327,8 @@ export default function Transactions() {
                   disabled={bulkDeleteMutation.isPending}
                   data-testid="button-bulk-delete"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Selected
+                  <Trash2 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Delete Selected</span>
                 </Button>
               )}
             </div>
@@ -333,6 +337,7 @@ export default function Transactions() {
               size="sm"
               onClick={handleExport}
               data-testid="button-export"
+              className="w-full sm:w-auto"
             >
               <Download className="h-4 w-4 mr-2" />
               Export CSV
@@ -340,21 +345,22 @@ export default function Transactions() {
           </div>
 
           {isLoading ? (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {[1, 2, 3, 4, 5].map(i => (
-                <Skeleton key={i} className="h-20" />
+                <Skeleton key={i} className="h-16 sm:h-20" />
               ))}
             </div>
           ) : filteredAndSortedExpenses.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {filteredAndSortedExpenses.map((expense) => (
-                <div key={expense.id} className="flex items-center gap-3">
+                <div key={expense.id} className="flex items-center gap-2 sm:gap-3">
                   <Checkbox
                     checked={selectedIds.has(expense.id)}
                     onCheckedChange={() => handleSelectOne(expense.id)}
                     data-testid={`checkbox-${expense.id}`}
+                    className="flex-shrink-0"
                   />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <TransactionCard
                       id={expense.id}
                       merchant={expense.merchant}

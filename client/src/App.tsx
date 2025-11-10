@@ -64,12 +64,12 @@ function AppLayout() {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar />
-        <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between p-4 border-b">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <header className="flex items-center justify-between p-3 sm:p-4 border-b flex-shrink-0">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <KeyboardShortcutsHelp />
               <ThemeToggle />
             </div>

@@ -100,21 +100,23 @@ export default function Dashboard() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <KeyboardShortcutsBanner />
 
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Track your spending</p>
+        <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Track your spending</p>
           </div>
           <Button
             onClick={() => setShowAddExpense(true)}
             data-testid="button-add-expense"
-            className="gap-2"
+            className="gap-2 flex-shrink-0"
+            size="sm"
           >
             <Plus className="h-4 w-4" />
-            Add Expense
+            <span className="hidden xs:inline">Add Expense</span>
+            <span className="xs:hidden">Add</span>
           </Button>
         </div>
 
@@ -152,19 +154,19 @@ export default function Dashboard() {
 
         <BudgetAlerts />
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
           {expensesLoading ? (
-            <Skeleton className="h-96" />
+            <Skeleton className="h-64 sm:h-96" />
           ) : chartData.length > 0 ? (
             <ExpenseChart data={chartData} />
           ) : (
-            <div className="flex items-center justify-center h-96 border rounded-lg">
-              <p className="text-muted-foreground">No expenses yet. Add your first expense to see the chart.</p>
+            <div className="flex items-center justify-center h-64 sm:h-96 border rounded-lg p-4">
+              <p className="text-sm sm:text-base text-muted-foreground text-center">No expenses yet. Add your first expense to see the chart.</p>
             </div>
           )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Categories</h3>
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-base sm:text-lg font-semibold">Categories</h3>
             {expensesLoading ? (
               <Skeleton className="h-64" />
             ) : categories.length > 0 ? (
@@ -186,17 +188,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h3 className="text-lg font-semibold">Recent Transactions</h3>
-            <div className="relative flex-1 max-w-md">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h3 className="text-base sm:text-lg font-semibold">Recent Transactions</h3>
+            <div className="relative flex-1 sm:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={searchInputRef}
-                placeholder="Search transactions (Ctrl+K)..."
+                placeholder="Search (Ctrl+K)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 text-sm"
               />
             </div>
           </div>

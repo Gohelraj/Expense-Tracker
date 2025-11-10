@@ -178,23 +178,23 @@ export default function TransactionDetails() {
 
     return (
         <div className="h-full overflow-y-auto">
-            <div className="container mx-auto p-6 max-w-6xl">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold">Transaction Details</h1>
-                    <p className="text-muted-foreground mt-2">
+            <div className="container mx-auto p-3 sm:p-4 md:p-6 max-w-6xl">
+                <div className="mb-4 sm:mb-6">
+                    <h1 className="text-2xl sm:text-3xl font-bold">Transaction Details</h1>
+                    <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
                         View and edit your transactions organized by date
                     </p>
                 </div>
 
                 {sortedDates.length === 0 ? (
                     <Card>
-                        <CardContent className="py-12 text-center">
-                            <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                            <p className="text-lg text-muted-foreground">No transactions found</p>
+                        <CardContent className="py-8 sm:py-12 text-center">
+                            <Calendar className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
+                            <p className="text-base sm:text-lg text-muted-foreground">No transactions found</p>
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-3 sm:space-y-6">
                         {sortedDates.map((date) => {
                             const dateExpenses = groupedExpenses[date];
                             const totalAmount = dateExpenses.reduce(
@@ -204,42 +204,45 @@ export default function TransactionDetails() {
 
                             return (
                                 <Card key={date}>
-                                    <CardHeader>
-                                        <div className="flex justify-between items-center">
-                                            <CardTitle className="text-xl">
-                                                {format(parseISO(date), "EEEE, MMMM d, yyyy")}
+                                    <CardHeader className="p-4 sm:p-6">
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                            <CardTitle className="text-base sm:text-xl">
+                                                <span className="hidden sm:inline">{format(parseISO(date), "EEEE, MMMM d, yyyy")}</span>
+                                                <span className="sm:hidden">{format(parseISO(date), "EEE, MMM d, yyyy")}</span>
                                             </CardTitle>
-                                            <div className="text-lg font-semibold">
+                                            <div className="text-base sm:text-lg font-semibold">
                                                 ₹{totalAmount.toFixed(2)}
                                             </div>
                                         </div>
                                     </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-3">
+                                    <CardContent className="p-3 sm:p-6">
+                                        <div className="space-y-2 sm:space-y-3">
                                             {dateExpenses.map((expense) => (
                                                 <div
                                                     key={expense.id}
-                                                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg hover:bg-accent/50 transition-colors gap-3"
                                                 >
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="font-semibold text-lg">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                                            <div className="font-semibold text-base sm:text-lg truncate">
                                                                 {expense.merchant}
                                                             </div>
-                                                            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                                                                {expense.category}
-                                                            </span>
-                                                            <span className="text-xs px-2 py-1 bg-secondary text-secondary-foreground rounded-full">
-                                                                {expense.paymentMethod}
-                                                            </span>
-                                                            {expense.source === "email" && (
-                                                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                                                                    Auto
+                                                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                                                <span className="text-xs px-2 py-0.5 sm:py-1 bg-primary/10 text-primary rounded-full">
+                                                                    {expense.category}
                                                                 </span>
-                                                            )}
+                                                                <span className="text-xs px-2 py-0.5 sm:py-1 bg-secondary text-secondary-foreground rounded-full">
+                                                                    {expense.paymentMethod}
+                                                                </span>
+                                                                {expense.source === "email" && (
+                                                                    <span className="text-xs px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-700 rounded-full">
+                                                                        Auto
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         {expense.notes && (
-                                                            <p className="text-sm text-muted-foreground mt-1">
+                                                            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                                                                 {expense.notes}
                                                             </p>
                                                         )}
@@ -247,24 +250,26 @@ export default function TransactionDetails() {
                                                             {format(parseISO(expense.date), "h:mm a")}
                                                         </p>
                                                     </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="text-xl font-bold">
+                                                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                                                        <div className="text-lg sm:text-xl font-bold">
                                                             ₹{parseFloat(expense.amount).toFixed(2)}
                                                         </div>
-                                                        <div className="flex gap-2">
+                                                        <div className="flex gap-1 sm:gap-2">
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 onClick={() => handleEdit(expense)}
+                                                                className="h-8 w-8 sm:h-10 sm:w-10"
                                                             >
-                                                                <Pencil className="h-4 w-4" />
+                                                                <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                                             </Button>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 onClick={() => handleDelete(expense.id)}
+                                                                className="h-8 w-8 sm:h-10 sm:w-10"
                                                             >
-                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                                                             </Button>
                                                         </div>
                                                     </div>
@@ -280,7 +285,7 @@ export default function TransactionDetails() {
 
                 {/* Edit Dialog */}
                 <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Edit Transaction</DialogTitle>
                             <DialogDescription>
@@ -289,7 +294,7 @@ export default function TransactionDetails() {
                         </DialogHeader>
 
                         {editingExpense && (
-                            <div className="space-y-4">
+                            <div className="space-y-3 sm:space-y-4">
                                 <div>
                                     <Label htmlFor="merchant">Merchant</Label>
                                     <Input

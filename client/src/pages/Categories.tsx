@@ -147,52 +147,52 @@ export default function Categories() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Categories</h1>
-          <p className="text-muted-foreground mt-1">Manage categories, budgets, and track spending</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Categories</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage categories, budgets, and track spending</p>
         </div>
 
         <Tabs defaultValue="budgets" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="budgets">Budgets & Spending</TabsTrigger>
-            <TabsTrigger value="manage">Manage Categories</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 max-w-md text-xs sm:text-sm">
+            <TabsTrigger value="budgets" className="px-2 sm:px-3">Budgets</TabsTrigger>
+            <TabsTrigger value="manage" className="px-2 sm:px-3">Manage</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="budgets" className="mt-6 space-y-6">
+          <TabsContent value="budgets" className="mt-4 sm:mt-6 space-y-3 sm:space-y-6">
             {isLoading ? (
-              <div className="grid gap-4">
+              <div className="grid gap-3 sm:gap-4">
                 {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-32" />
+                  <Skeleton key={i} className="h-24 sm:h-32" />
                 ))}
               </div>
             ) : categoryList.length > 0 ? (
-              <div className="grid gap-4">
+              <div className="grid gap-3 sm:gap-4">
                 {categoryList.map((category) => {
                   const Icon = getCategoryIcon(category.name);
                   const color = getCategoryColor(category.name);
 
                   return (
-                    <Card key={category.name} className="p-6 space-y-4">
-                      <div className="flex items-center gap-4">
+                    <Card key={category.name} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                      <div className="flex items-start sm:items-center gap-3 sm:gap-4">
                         <div
-                          className="h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0"
+                          className="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: `${color}20` }}
                         >
-                          <Icon className="h-6 w-6" style={{ color }} />
+                          <Icon className="h-5 w-5 sm:h-6 sm:w-6" style={{ color }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-lg">{category.name}</h3>
-                          <p className="text-sm text-muted-foreground">
+                          <h3 className="font-semibold text-base sm:text-lg">{category.name}</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             {category.count} {category.count === 1 ? 'transaction' : 'transactions'} this month
                           </p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-2xl font-mono font-bold">
+                          <p className="text-lg sm:text-2xl font-mono font-bold">
                             ₹{category.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                           </p>
                           {category.budget > 0 && (
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs sm:text-sm text-muted-foreground">
                               of ₹{category.budget.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </p>
                           )}
@@ -202,6 +202,7 @@ export default function Categories() {
                           size="icon"
                           onClick={() => handleEditBudget(category.name, category.budget)}
                           data-testid={`button-edit-budget-${category.name}`}
+                          className="flex-shrink-0"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>

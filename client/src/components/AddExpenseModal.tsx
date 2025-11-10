@@ -94,7 +94,7 @@ export default function AddExpenseModal({ open, onOpenChange }: AddExpenseModalP
       });
       return;
     }
-    
+
     createExpenseMutation.mutate({
       amount: amount,
       merchant,
@@ -108,11 +108,11 @@ export default function AddExpenseModal({ open, onOpenChange }: AddExpenseModalP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Expense</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div>
             <Label htmlFor="amount" className="text-sm font-medium">
               Amount
@@ -132,7 +132,7 @@ export default function AddExpenseModal({ open, onOpenChange }: AddExpenseModalP
 
           <div>
             <Label className="text-sm font-medium mb-3 block">Category</Label>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               {CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
                 return (
@@ -140,18 +140,17 @@ export default function AddExpenseModal({ open, onOpenChange }: AddExpenseModalP
                     key={cat.name}
                     type="button"
                     onClick={() => setCategory(cat.name)}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-lg hover-elevate active-elevate-2 ${
-                      category === cat.name ? 'ring-2 ring-primary' : ''
-                    }`}
+                    className={`flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg hover-elevate active-elevate-2 ${category === cat.name ? 'ring-2 ring-primary' : ''
+                      }`}
                     data-testid={`button-category-${cat.name.toLowerCase()}`}
                   >
                     <div
-                      className="h-10 w-10 rounded-full flex items-center justify-center"
+                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: `${cat.color}20` }}
                     >
-                      <Icon className="h-5 w-5" style={{ color: cat.color }} />
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: cat.color }} />
                     </div>
-                    <span className="text-xs font-medium">{cat.name}</span>
+                    <span className="text-xs font-medium text-center leading-tight">{cat.name}</span>
                   </button>
                 );
               })}
@@ -189,7 +188,7 @@ export default function AddExpenseModal({ open, onOpenChange }: AddExpenseModalP
 
           <div>
             <Label className="text-sm font-medium mb-2 block">Payment Method</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {PAYMENT_METHODS.map((method) => (
                 <Button
                   key={method}
@@ -197,6 +196,7 @@ export default function AddExpenseModal({ open, onOpenChange }: AddExpenseModalP
                   variant={paymentMethod === method ? "default" : "outline"}
                   size="sm"
                   onClick={() => setPaymentMethod(method)}
+                  className="flex-1 min-w-[70px]"
                   data-testid={`button-payment-${method.toLowerCase()}`}
                 >
                   {method}
