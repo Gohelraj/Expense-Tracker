@@ -1,11 +1,40 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { Pool } from "pg";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { emailPollingService } from "./email-polling-service";
 import { emailService } from "./email-service";
 
 const app = express();
+
+// Set up PostgreSQL session store
+const PgSession = connectPgSimple(session);
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Configure session middleware
+app.use(
+  session({
+    store: new PgSession({
+      pool: pgPool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      httpOnly: true, // Prevents XSS attacks
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: "lax", // CSRF protection
+    },
+  })
+);
 
 declare module 'http' {
   interface IncomingMessage {

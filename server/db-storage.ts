@@ -50,37 +50,47 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getExpenses(): Promise<Expense[]> {
-    return await db.select().from(expenses).orderBy(desc(expenses.date));
+  async getExpenses(userId: string): Promise<Expense[]> {
+    return await db.select().from(expenses)
+      .where(eq(expenses.userId, userId))
+      .orderBy(desc(expenses.date));
   }
 
-  async getExpenseById(id: string): Promise<Expense | undefined> {
-    const result = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  async getExpenseById(id: string, userId: string): Promise<Expense | undefined> {
+    const result = await db.select().from(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .limit(1);
     return result[0];
   }
 
-  async updateExpense(id: string, updates: Partial<InsertExpense>): Promise<Expense | undefined> {
-    const result = await db.update(expenses).set(updates).where(eq(expenses.id, id)).returning();
+  async updateExpense(id: string, userId: string, updates: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const result = await db.update(expenses)
+      .set(updates)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning();
     return result[0];
   }
 
-  async deleteExpense(id: string): Promise<boolean> {
-    const result = await db.delete(expenses).where(eq(expenses.id, id)).returning();
+  async deleteExpense(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning();
     return result.length > 0;
   }
 
-  async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]> {
+  async getExpensesByDateRange(userId: string, startDate: Date, endDate: Date): Promise<Expense[]> {
     return await db.select().from(expenses)
       .where(and(
+        eq(expenses.userId, userId),
         gte(expenses.date, startDate),
         lte(expenses.date, endDate)
       ))
       .orderBy(desc(expenses.date));
   }
 
-  async getExpensesByCategory(category: string): Promise<Expense[]> {
+  async getExpensesByCategory(userId: string, category: string): Promise<Expense[]> {
     return await db.select().from(expenses)
-      .where(eq(expenses.category, category))
+      .where(and(eq(expenses.userId, userId), eq(expenses.category, category)))
       .orderBy(desc(expenses.date));
   }
 
@@ -89,35 +99,41 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getBudgets(): Promise<Budget[]> {
-    return await db.select().from(budgets);
+  async getBudgets(userId: string): Promise<Budget[]> {
+    return await db.select().from(budgets).where(eq(budgets.userId, userId));
   }
 
-  async getBudgetByCategory(category: string): Promise<Budget | undefined> {
-    const result = await db.select().from(budgets).where(eq(budgets.category, category)).limit(1);
+  async getBudgetByCategory(userId: string, category: string): Promise<Budget | undefined> {
+    const result = await db.select().from(budgets)
+      .where(and(eq(budgets.userId, userId), eq(budgets.category, category)))
+      .limit(1);
     return result[0];
   }
 
-  async updateBudget(category: string, amount: string): Promise<Budget | undefined> {
+  async updateBudget(userId: string, category: string, amount: string): Promise<Budget | undefined> {
     const result = await db.update(budgets)
       .set({ amount, updatedAt: new Date() })
-      .where(eq(budgets.category, category))
+      .where(and(eq(budgets.userId, userId), eq(budgets.category, category)))
       .returning();
     return result[0];
   }
 
-  async deleteBudget(category: string): Promise<boolean> {
-    const result = await db.delete(budgets).where(eq(budgets.category, category)).returning();
+  async deleteBudget(userId: string, category: string): Promise<boolean> {
+    const result = await db.delete(budgets)
+      .where(and(eq(budgets.userId, userId), eq(budgets.category, category)))
+      .returning();
     return result.length > 0;
   }
 
-  async isEmailProcessed(emailId: string): Promise<boolean> {
-    const result = await db.select().from(processedEmails).where(eq(processedEmails.emailId, emailId)).limit(1);
+  async isEmailProcessed(userId: string, emailId: string): Promise<boolean> {
+    const result = await db.select().from(processedEmails)
+      .where(and(eq(processedEmails.userId, userId), eq(processedEmails.emailId, emailId)))
+      .limit(1);
     return result.length > 0;
   }
 
-  async markEmailAsProcessed(emailId: string): Promise<ProcessedEmail> {
-    const result = await db.insert(processedEmails).values({ emailId }).returning();
+  async markEmailAsProcessed(userId: string, emailId: string): Promise<ProcessedEmail> {
+    const result = await db.insert(processedEmails).values({ userId, emailId }).returning();
     return result[0];
   }
 
@@ -127,25 +143,31 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getBankPatterns(): Promise<BankPattern[]> {
-    return await db.select().from(bankPatterns).orderBy(desc(bankPatterns.createdAt));
+  async getBankPatterns(userId: string): Promise<BankPattern[]> {
+    return await db.select().from(bankPatterns)
+      .where(eq(bankPatterns.userId, userId))
+      .orderBy(desc(bankPatterns.createdAt));
   }
 
-  async getBankPatternById(id: string): Promise<BankPattern | undefined> {
-    const result = await db.select().from(bankPatterns).where(eq(bankPatterns.id, id)).limit(1);
+  async getBankPatternById(id: string, userId: string): Promise<BankPattern | undefined> {
+    const result = await db.select().from(bankPatterns)
+      .where(and(eq(bankPatterns.id, id), eq(bankPatterns.userId, userId)))
+      .limit(1);
     return result[0];
   }
 
-  async updateBankPattern(id: string, updates: Partial<InsertBankPattern>): Promise<BankPattern | undefined> {
+  async updateBankPattern(id: string, userId: string, updates: Partial<InsertBankPattern>): Promise<BankPattern | undefined> {
     const result = await db.update(bankPatterns)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(bankPatterns.id, id))
+      .where(and(eq(bankPatterns.id, id), eq(bankPatterns.userId, userId)))
       .returning();
     return result[0];
   }
 
-  async deleteBankPattern(id: string): Promise<boolean> {
-    const result = await db.delete(bankPatterns).where(eq(bankPatterns.id, id)).returning();
+  async deleteBankPattern(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(bankPatterns)
+      .where(and(eq(bankPatterns.id, id), eq(bankPatterns.userId, userId)))
+      .returning();
     return result.length > 0;
   }
 
@@ -155,30 +177,38 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getCategories(): Promise<Category[]> {
-    return await db.select().from(categories).orderBy(categories.name);
+  async getCategories(userId: string): Promise<Category[]> {
+    return await db.select().from(categories)
+      .where(eq(categories.userId, userId))
+      .orderBy(categories.name);
   }
 
-  async getCategoryById(id: string): Promise<Category | undefined> {
-    const result = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+  async getCategoryById(id: string, userId: string): Promise<Category | undefined> {
+    const result = await db.select().from(categories)
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)))
+      .limit(1);
     return result[0];
   }
 
-  async getCategoryByName(name: string): Promise<Category | undefined> {
-    const result = await db.select().from(categories).where(eq(categories.name, name)).limit(1);
+  async getCategoryByName(userId: string, name: string): Promise<Category | undefined> {
+    const result = await db.select().from(categories)
+      .where(and(eq(categories.userId, userId), eq(categories.name, name)))
+      .limit(1);
     return result[0];
   }
 
-  async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category | undefined> {
+  async updateCategory(id: string, userId: string, updates: Partial<InsertCategory>): Promise<Category | undefined> {
     const result = await db.update(categories)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(categories.id, id))
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)))
       .returning();
     return result[0];
   }
 
-  async deleteCategory(id: string): Promise<boolean> {
-    const result = await db.delete(categories).where(eq(categories.id, id)).returning();
+  async deleteCategory(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(categories)
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)))
+      .returning();
     return result.length > 0;
   }
 }

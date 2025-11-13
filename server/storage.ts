@@ -16,38 +16,38 @@ export interface IStorage {
 
   // Expense methods
   createExpense(expense: InsertExpense): Promise<Expense>;
-  getExpenses(): Promise<Expense[]>;
-  getExpenseById(id: string): Promise<Expense | undefined>;
-  updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
-  deleteExpense(id: string): Promise<boolean>;
-  getExpensesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]>;
-  getExpensesByCategory(category: string): Promise<Expense[]>;
+  getExpenses(userId: string): Promise<Expense[]>;
+  getExpenseById(id: string, userId: string): Promise<Expense | undefined>;
+  updateExpense(id: string, userId: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
+  deleteExpense(id: string, userId: string): Promise<boolean>;
+  getExpensesByDateRange(userId: string, startDate: Date, endDate: Date): Promise<Expense[]>;
+  getExpensesByCategory(userId: string, category: string): Promise<Expense[]>;
 
   // Budget methods
   createBudget(budget: InsertBudget): Promise<Budget>;
-  getBudgets(): Promise<Budget[]>;
-  getBudgetByCategory(category: string): Promise<Budget | undefined>;
-  updateBudget(category: string, amount: string): Promise<Budget | undefined>;
-  deleteBudget(category: string): Promise<boolean>;
+  getBudgets(userId: string): Promise<Budget[]>;
+  getBudgetByCategory(userId: string, category: string): Promise<Budget | undefined>;
+  updateBudget(userId: string, category: string, amount: string): Promise<Budget | undefined>;
+  deleteBudget(userId: string, category: string): Promise<boolean>;
 
   // Processed Email methods
-  isEmailProcessed(emailId: string): Promise<boolean>;
-  markEmailAsProcessed(emailId: string): Promise<ProcessedEmail>;
+  isEmailProcessed(userId: string, emailId: string): Promise<boolean>;
+  markEmailAsProcessed(userId: string, emailId: string): Promise<ProcessedEmail>;
 
   // Bank Pattern methods
   createBankPattern(bankPattern: InsertBankPattern): Promise<BankPattern>;
-  getBankPatterns(): Promise<BankPattern[]>;
-  getBankPatternById(id: string): Promise<BankPattern | undefined>;
-  updateBankPattern(id: string, updates: Partial<InsertBankPattern>): Promise<BankPattern | undefined>;
-  deleteBankPattern(id: string): Promise<boolean>;
+  getBankPatterns(userId: string): Promise<BankPattern[]>;
+  getBankPatternById(id: string, userId: string): Promise<BankPattern | undefined>;
+  updateBankPattern(id: string, userId: string, updates: Partial<InsertBankPattern>): Promise<BankPattern | undefined>;
+  deleteBankPattern(id: string, userId: string): Promise<boolean>;
 
   // Category methods
   createCategory(category: InsertCategory): Promise<Category>;
-  getCategories(): Promise<Category[]>;
-  getCategoryById(id: string): Promise<Category | undefined>;
-  getCategoryByName(name: string): Promise<Category | undefined>;
-  updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category | undefined>;
-  deleteCategory(id: string): Promise<boolean>;
+  getCategories(userId: string): Promise<Category[]>;
+  getCategoryById(id: string, userId: string): Promise<Category | undefined>;
+  getCategoryByName(userId: string, name: string): Promise<Category | undefined>;
+  updateCategory(id: string, userId: string, updates: Partial<InsertCategory>): Promise<Category | undefined>;
+  deleteCategory(id: string, userId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {

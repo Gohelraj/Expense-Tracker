@@ -25,13 +25,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const storedUser = localStorage.getItem("user");
-                if (storedUser) {
-                    setUser(JSON.parse(storedUser));
+                const response = await fetch("/api/auth/me");
+                if (response.ok) {
+                    const userData = await response.json();
+                    setUser(userData);
+                } else {
+                    setUser(null);
                 }
             } catch (error) {
                 console.error("Auth check failed:", error);
-                localStorage.removeItem("user");
+                setUser(null);
             } finally {
                 setIsLoading(false);
             }
@@ -45,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
+            credentials: "include", // Important: include cookies
         });
 
         if (!response.ok) {
@@ -56,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = data.user;
 
         setUser(userData);
-        localStorage.setItem("user", JSON.stringify(userData));
         setLocation("/");
     };
 
@@ -65,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password, email }),
+            credentials: "include", // Important: include cookies
         });
 
         if (!response.ok) {
@@ -72,19 +76,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw new Error(error.error || "Registration failed");
         }
 
-        // Auto-login after registration
-        await login(username, password);
+        const userData = await response.json();
+        setUser(userData);
+        setLocation("/");
     };
 
     const logout = async () => {
         try {
-            await fetch("/api/auth/logout", { method: "POST" });
+            await fetch("/api/auth/logout", {
+                method: "POST",
+                credentials: "include", // Important: include cookies
+            });
         } catch (error) {
             console.error("Logout request failed:", error);
         }
 
         setUser(null);
-        localStorage.removeItem("user");
         setLocation("/login");
     };
 
